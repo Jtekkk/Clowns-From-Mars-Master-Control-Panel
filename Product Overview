@@ -1,0 +1,86 @@
+
+Product Overview
+An intelligent mastering solution designed to accelerate your workflow while delivering professional-grade results. The plugin combines smart analysis, analog-modeled processing, and flexible tonal shaping in a streamlined interface.
+
+Intelligent Mastering Assistant
+The built-in analysis engine examines your track's loudest section to generate tailored suggestions specific to your audio material. Ten Smart Presets are automatically created based on this analysis, with every adjustment level-matched to maintain consistent perceived loudness as you audition options.
+
+Navigate presets instantly using the dedicated arrow controls, or "lock" individual modules to preserve your favorite settings while exploring alternative configurations elsewhere in the chain.
+
+Reference Track Integration: Import your own reference material to build custom sonic profiles. Compare your work against your target and steer your master toward the desired result with precision.
+
+Dynamics Processing
+Class-A Discrete Compressor: A transformer-balanced compressor offering three operational modes—Stereo, Dual-Mono, and Mid/Side—for comprehensive control over your stereo field.
+
+Two-Stage Architecture: Independent Optical and Discrete compression sections enable sophisticated serial compression techniques, allowing you to shape transients and sustain separately.
+
+Output Transformer Selection: Choose from three distinct transformer characters:
+
+Nickel: Adds airy top-end sparkle
+Iron: Introduces subtle midrange character
+Steel: Provides additional harmonic saturation
+Equalization
+Five-Band Parametric EQ: Mastering-grade equalization delivering precision, flexibility, and musical detail. Features include:
+
+Q-Curve Flexibility: Independently switch between Constant Q and Proportional Q across all five bands for targeted boosts and cuts
+Auto Listen: Isolate EQ effects to accurately position filters within the frequency spectrum
+Variable High-Pass and Low-Pass Filters with dedicated controls
+Low-Frequency Management:
+
+Mono Maker: Sums content below 200 Hz to mono for focused, punchy bass response
+Octave Filler: Extends and enriches low-end extension
+Stereo Field Control:
+
+Stereo Width: Expand the stereo image of your tracks
+M/S Processing: Full mid/side capability for independent mono and stereo information processing
+Analysis Tools: Integrated FFT spectrum analyzer with real-time visual feedback.
+
+Analog Tone Shaping
+Class-A Tube Circuitry: Transformer-balanced design with custom high-headroom transformers and variable THD for controlled saturation.
+
+Unique Digital Fingerprint: Each license generates a model specific to your serial number, ensuring a distinct sonic character.
+
+Baxandall EQ Section: Three-band design with Pultec-inspired low-end response.
+
+Specialized Filters:
+
+AIR: Enhances top-end presence and sheen
+TIGHT: Cleans up low-frequency mud
+Character Switches:
+
+VINTAGE: Smooths aggressive top-end frequencies
+ASPECT RATIO: Enhances stereo image width and depth
+GAIN LINK: Streamlines gain staging across modules
+Extended Control:
+
+HEADROOM Knob: Adjust internal operating levels for optimal signal flow
+OUTPUT TRIM: ±10 dB of analog-modeled gain adjustment
+CIRCUIT BEND: Access distorted and degraded textures for creative applications
+Metering: Stereo output meter displaying both RMS and peak levels with automatic internal oversampling.
+
+Multi-Stage Saturation
+MOJO Amplifiers: Three distinct amp models delivering multi-stage saturation with varying harmonic characteristics.
+
+Colour Modules: Five specialized modules providing diverse tonal effects and texture options.
+
+Tape Emulation
+Authentic analog tape saturation with precise modeling of tape machine behavior.
+
+Modern Enhancements (Ultimate Mode): Improved clarity, spatiality, and frequency control for contemporary production workflows.
+
+Tape Machine Controls:
+
+Selectable Tape Speed: 15 ips or 30 ips operation
+High-Speed Recording Simulation
+Drive Parameter: Extended resolution for detailed saturation control
+Tone Adjustments:
+
+Low Frequency Adjust: Compensates for head resonance and tape speed artifacts
+High Frequency Adjust: Fine resolution for precise tonal shaping
+Dynamic Response: Authentic tape compression behavior without unwanted artifacts—no crosstalk, pre/post echoes, or noise floor interference.
+
+Workflow Features
+Quick A/B Comparison Mode: Instantly compare processed and unprocessed signals
+Scalable User Interface: Adapt the interface to your screen and workflow preferences
+Artist Presets: Curated starting points from professional engineers
+Mono Version Available: Dedicated mono variant for processing individual elements (kick, snare, bass, vocals, etc.)
