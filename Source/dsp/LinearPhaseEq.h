@@ -3,6 +3,7 @@
 #include "DspCommon.h"
 #include <functional>
 #include <array>
+#include <complex>
 
 namespace cfm::dsp
 {
@@ -10,11 +11,18 @@ namespace cfm::dsp
         Linear-phase EQ via frequency-sampling FIR design + direct convolution.
 
         The minimum-phase biquad cascade (EqualizerModule) supplies the target
-        magnitude response; we sample it across the spectrum, inverse-FFT it to a
-        zero-phase impulse, window it into a symmetric (hence linear-phase) FIR,
-        and convolve. Result: the exact same magnitude curve with zero phase
-        distortion — no group-delay smearing of transients, at the cost of a
-        fixed latency of (FIR length − 1)/2 samples (reported to the host).
+        magnitude response; we sample it across the spectrum, inverse-transform
+        it to a zero-phase impulse, window it into a symmetric (hence
+        linear-phase) FIR, and convolve. Result: the exact same magnitude curve
+        with zero phase distortion — no group-delay smearing of transients, at
+        the cost of a fixed latency of (FIR length − 1)/2 samples (reported to
+        the host).
+
+        The inverse transform uses a small self-contained double-precision
+        radix-2 FFT rather than juce::dsp::FFT: the latter's scaling/engine is
+        platform-dependent (and was observed to return incorrect results in some
+        builds), which would corrupt the kernel. Owning the transform guarantees
+        an exact, unity-at-flat kernel everywhere.
 
         The kernel is rebuilt only when the EQ settings actually change, using
         preallocated buffers, so steady-state playback does no FFT work.
@@ -55,18 +63,19 @@ namespace cfm::dsp
                 double f = (double) kk * sampleRate / (double) fftSize;
                 f = juce::jmin (f, nyq);
                 const double m = juce::jlimit (mMin, mMax, magAt (f));
-                spec[(size_t) k] = { (float) m, 0.0f };
+                spec[(size_t) k] = { m, 0.0 };   // real, zero-phase spectrum
             }
-            fft.perform (spec.data(), spec.data(), true); // inverse (unnormalised)
 
-            const int centre = latency;
-            const double norm = 1.0 / (double) fftSize;
+            transform (spec.data(), /*inverse*/ true);  // unnormalised inverse DFT
+
+            const int    centre = latency;
+            const double norm   = 1.0 / (double) fftSize; // normalise the inverse
             for (int j = 0; j < firLen; ++j)
             {
                 const int src = (j - centre + fftSize) % fftSize;
                 const double w = 0.5 - 0.5 * std::cos (2.0 * juce::MathConstants<double>::pi
                                                        * j / (firLen - 1));
-                kernel[(size_t) j] = (double) spec[(size_t) src].real() * norm * w;
+                kernel[(size_t) j] = spec[(size_t) src].real() * norm * w;
             }
             haveKernel = true;
         }
@@ -103,12 +112,44 @@ namespace cfm::dsp
         }
 
     private:
+        // In-place iterative radix-2 Cooley–Tukey FFT. `inverse` uses +2π/len;
+        // neither direction is scaled — rebuild() divides by fftSize. Exact and
+        // deterministic on every platform.
+        static void transform (std::complex<double>* a, bool inverse) noexcept
+        {
+            const int n = fftSize;
+            for (int i = 1, j = 0; i < n; ++i)
+            {
+                int bit = n >> 1;
+                for (; j & bit; bit >>= 1) j ^= bit;
+                j ^= bit;
+                if (i < j) std::swap (a[i], a[j]);
+            }
+            for (int len = 2; len <= n; len <<= 1)
+            {
+                const double ang = 2.0 * juce::MathConstants<double>::pi / (double) len
+                                   * (inverse ? 1.0 : -1.0);
+                const std::complex<double> wlen (std::cos (ang), std::sin (ang));
+                for (int i = 0; i < n; i += len)
+                {
+                    std::complex<double> w (1.0, 0.0);
+                    for (int k = 0; k < len / 2; ++k)
+                    {
+                        const std::complex<double> u = a[i + k];
+                        const std::complex<double> v = a[i + k + len / 2] * w;
+                        a[i + k]             = u + v;
+                        a[i + k + len / 2]   = u - v;
+                        w *= wlen;
+                    }
+                }
+            }
+        }
+
         double sampleRate = 44100.0;
         int    channels   = 2;
         bool   haveKernel = false;
 
-        juce::dsp::FFT fft { fftOrder };
-        std::array<juce::dsp::Complex<float>, fftSize> spec {};
+        std::array<std::complex<double>, fftSize> spec {};
         std::array<double, firLen> kernel {};
         std::array<std::array<double, firLen>, 2> line {};
         std::array<int, 2> pos { 0, 0 };

@@ -10,6 +10,7 @@
 // ============================================================================
 #include <juce_gui_extra/juce_gui_extra.h>
 #include <juce_audio_processors/juce_audio_processors.h>
+#include <juce_dsp/juce_dsp.h>
 #include <cmath>
 #include <cstdio>
 
@@ -309,6 +310,35 @@ int main (int argc, char** argv)
         std::printf ("  EQ probe: low-shelf +12 dB (propQ on) plateau %+.1f dB, sweep peak %+.1f dB (overshoot %.1f dB)\n",
                      plateau, peak, peak - 12.0);
         if (peak - 12.0 > 1.5) { std::printf ("  !! shelf resonance: Proportional-Q inflating shelf Q\n"); ok = false; }
+
+        // Linear-phase FIR must reproduce the same magnitude as the min-phase
+        // cascade: flat -> unity, and a boost must match within tolerance.
+        for (auto* p : params) p->setValueNotifyingHost (p->getDefaultValue());
+        setP ("Auto Gain", 0); setP ("Tube On", 0); setP ("Comp On", 0); setP ("Tape On", 0);
+        setP ("EQ On", 1); setP ("Oversampling", 0); setP ("HP On", 0); setP ("LP On", 0);
+        setP ("Mix", 100); setP ("AIR", 0); setP ("TIGHT", 0); setP ("Proportional Q", 0);
+        setP ("Low Shelf Gain", 0); setP ("Low Mid Gain", 0); setP ("Mid Gain", 0);
+        setP ("High Mid Gain", 0); setP ("High Shelf Gain", 0);
+
+        setP ("Linear Phase", 1);
+        const double linFlat1k  = measureGainDb (1000.0);
+        const double linFlat100 = measureGainDb (100.0);
+        const double linFlat10k = measureGainDb (10000.0);
+        std::printf ("  LINPHASE flat: @100=%+.2f @1k=%+.2f @10k=%+.2f dB (expect ~0)\n",
+                     linFlat100, linFlat1k, linFlat10k);
+        if (std::abs (linFlat1k) > 0.5 || std::abs (linFlat100) > 0.6 || std::abs (linFlat10k) > 0.6)
+        { std::printf ("  !! linear-phase flat is not unity\n"); ok = false; }
+
+        setP ("Linear Phase", 0);
+        setP ("High Mid On", 1); setP ("High Mid Freq", 3000); setP ("High Mid Q", 1.0); setP ("High Mid Gain", 6);
+        setP ("Low Shelf On", 1); setP ("Low Shelf Freq", 120); setP ("Low Shelf Q", 0.7); setP ("Low Shelf Gain", 4);
+        const double minA = measureGainDb (3000.0), minB = measureGainDb (1000.0), minC = measureGainDb (120.0);
+        setP ("Linear Phase", 1);
+        const double linA = measureGainDb (3000.0), linB = measureGainDb (1000.0), linC = measureGainDb (120.0);
+        std::printf ("  LINPHASE curve: min[@120=%+.2f @1k=%+.2f @3k=%+.2f]  lin[@120=%+.2f @1k=%+.2f @3k=%+.2f]\n",
+                     minC, minB, minA, linC, linB, linA);
+        if (std::abs (linA - minA) > 1.5 || std::abs (linB - minB) > 1.0 || std::abs (linC - minC) > 1.5)
+        { std::printf ("  !! linear-phase magnitude does not match minimum-phase curve\n"); ok = false; }
     }
 
     std::printf ("DSP verification: %s  (fuzz finite ok, fuzzMaxAbs=%.2f, worstLatency=%d)\n",
