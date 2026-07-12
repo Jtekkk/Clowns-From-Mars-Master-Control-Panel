@@ -2,10 +2,10 @@
 #include "PluginEditor.h"
 #include "Presets.h"
 
-using namespace tt;
+using namespace cfm;
 
 //==============================================================================
-TurboTubesAudioProcessor::TurboTubesAudioProcessor()
+ControlPanelAudioProcessor::ControlPanelAudioProcessor()
     : AudioProcessor (BusesProperties()
         .withInput  ("Input",     juce::AudioChannelSet::stereo(), true)
         .withOutput ("Output",    juce::AudioChannelSet::stereo(), true)
@@ -17,10 +17,10 @@ TurboTubesAudioProcessor::TurboTubesAudioProcessor()
     driftModel.setSerial (serial);
 }
 
-void TurboTubesAudioProcessor::cacheParams()
+void ControlPanelAudioProcessor::cacheParams()
 {
     auto g = [this] (const char* id) { return apvts.getRawParameterValue (id); };
-    using namespace tt::params::id;
+    using namespace cfm::params::id;
 
     raw.inputTrim = g (inputTrim); raw.outputTrim = g (outputTrim); raw.headroom = g (headroom);
     raw.mix = g (mix); raw.bypass = g (bypass); raw.delta = g (delta);
@@ -51,7 +51,7 @@ void TurboTubesAudioProcessor::cacheParams()
     raw.width = g (width); raw.monoFreq = g (monoFreq);
 }
 
-void TurboTubesAudioProcessor::ensureSerial()
+void ControlPanelAudioProcessor::ensureSerial()
 {
     // Persisted in state; if absent, mint a deterministic-but-unique fingerprint.
     if (serial == 0)
@@ -69,7 +69,7 @@ void TurboTubesAudioProcessor::ensureSerial()
 }
 
 //==============================================================================
-bool TurboTubesAudioProcessor::isBusesLayoutSupported (const BusesLayout& layouts) const
+bool ControlPanelAudioProcessor::isBusesLayoutSupported (const BusesLayout& layouts) const
 {
     const auto mainOut = layouts.getMainOutputChannelSet();
     const auto mainIn  = layouts.getMainInputChannelSet();
@@ -90,7 +90,7 @@ bool TurboTubesAudioProcessor::isBusesLayoutSupported (const BusesLayout& layout
 }
 
 //==============================================================================
-void TurboTubesAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
+void ControlPanelAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
 {
     baseSampleRate = sampleRate;
     maxBlockSize   = samplesPerBlock;
@@ -126,12 +126,12 @@ void TurboTubesAudioProcessor::prepareToPlay (double sampleRate, int samplesPerB
 }
 
 //==============================================================================
-void TurboTubesAudioProcessor::alignedDrySetup (int block)
+void ControlPanelAudioProcessor::alignedDrySetup (int block)
 {
     alignedDry.setSize (2, block);
 }
 
-void TurboTubesAudioProcessor::selectOversampling (int choice, int mainCh)
+void ControlPanelAudioProcessor::selectOversampling (int choice, int mainCh)
 {
     if (choice == currentOsChoice) return;
     currentOsChoice = choice;
@@ -161,7 +161,7 @@ void TurboTubesAudioProcessor::selectOversampling (int choice, int mainCh)
 }
 
 //==============================================================================
-void TurboTubesAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer&)
+void ControlPanelAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer&)
 {
     juce::ScopedNoDenormals noDenormals;
 
@@ -397,30 +397,30 @@ void TurboTubesAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
 }
 
 //==============================================================================
-juce::AudioProcessorEditor* TurboTubesAudioProcessor::createEditor()
+juce::AudioProcessorEditor* ControlPanelAudioProcessor::createEditor()
 {
-    return new TurboTubesAudioProcessorEditor (*this);
+    return new ControlPanelAudioProcessorEditor (*this);
 }
 
 //==============================================================================
-int TurboTubesAudioProcessor::getNumPrograms()          { return (int) tt::presets::factory().size(); }
-const juce::String TurboTubesAudioProcessor::getProgramName (int index)
+int ControlPanelAudioProcessor::getNumPrograms()          { return (int) cfm::presets::factory().size(); }
+const juce::String ControlPanelAudioProcessor::getProgramName (int index)
 {
-    auto& f = tt::presets::factory();
+    auto& f = cfm::presets::factory();
     return juce::isPositiveAndBelow (index, (int) f.size()) ? f[(size_t) index].name : juce::String();
 }
 
-void TurboTubesAudioProcessor::setCurrentProgram (int index)
+void ControlPanelAudioProcessor::setCurrentProgram (int index)
 {
-    auto& f = tt::presets::factory();
+    auto& f = cfm::presets::factory();
     if (! juce::isPositiveAndBelow (index, (int) f.size())) return;
     currentProgram = index;
     applyProgram (index);
 }
 
-void TurboTubesAudioProcessor::applyProgram (int index)
+void ControlPanelAudioProcessor::applyProgram (int index)
 {
-    auto& f = tt::presets::factory();
+    auto& f = cfm::presets::factory();
     if (! juce::isPositiveAndBelow (index, (int) f.size())) return;
     for (auto& kv : f[(size_t) index].values)
         if (auto* p = dynamic_cast<juce::RangedAudioParameter*> (apvts.getParameter (kv.first)))
@@ -428,14 +428,14 @@ void TurboTubesAudioProcessor::applyProgram (int index)
 }
 
 //==============================================================================
-void TurboTubesAudioProcessor::storeSnapshot (int slot)
+void ControlPanelAudioProcessor::storeSnapshot (int slot)
 {
     if (! juce::isPositiveAndBelow (slot, numSnapshots)) return;
     snapshots[(size_t) slot] = apvts.copyState();
     activeSnapshot = slot;
 }
 
-void TurboTubesAudioProcessor::recallSnapshot (int slot)
+void ControlPanelAudioProcessor::recallSnapshot (int slot)
 {
     if (! juce::isPositiveAndBelow (slot, numSnapshots)) return;
     if (snapshots[(size_t) slot].isValid())
@@ -446,7 +446,7 @@ void TurboTubesAudioProcessor::recallSnapshot (int slot)
 }
 
 //==============================================================================
-void TurboTubesAudioProcessor::getStateInformation (juce::MemoryBlock& destData)
+void ControlPanelAudioProcessor::getStateInformation (juce::MemoryBlock& destData)
 {
     auto state = apvts.copyState();
     state.setProperty ("serial", serial, nullptr);
@@ -466,7 +466,7 @@ void TurboTubesAudioProcessor::getStateInformation (juce::MemoryBlock& destData)
     copyXmlToBinary (*xml, destData);
 }
 
-void TurboTubesAudioProcessor::setStateInformation (const void* data, int sizeInBytes)
+void ControlPanelAudioProcessor::setStateInformation (const void* data, int sizeInBytes)
 {
     std::unique_ptr<juce::XmlElement> xml (getXmlFromBinary (data, sizeInBytes));
     if (xml == nullptr) return;
@@ -498,5 +498,5 @@ void TurboTubesAudioProcessor::setStateInformation (const void* data, int sizeIn
 //==============================================================================
 juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter()
 {
-    return new TurboTubesAudioProcessor();
+    return new ControlPanelAudioProcessor();
 }

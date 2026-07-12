@@ -14,7 +14,7 @@
 #include "dsp/Metering.h"
 
 /**
-    TURBO TUBES — intelligent analog-modelled mastering processor.
+    MASTER CONTROL PANEL — intelligent analog-modelled mastering processor.
 
     Signal flow (per block):
 
@@ -31,11 +31,11 @@
     oversampling with reported latency, latency-compensated dry path so mix
     and delta stay phase-aligned.
 */
-class TurboTubesAudioProcessor : public juce::AudioProcessor
+class ControlPanelAudioProcessor : public juce::AudioProcessor
 {
 public:
-    TurboTubesAudioProcessor();
-    ~TurboTubesAudioProcessor() override = default;
+    ControlPanelAudioProcessor();
+    ~ControlPanelAudioProcessor() override = default;
 
     void prepareToPlay (double sampleRate, int samplesPerBlock) override;
     void releaseResources() override {}
@@ -64,9 +64,9 @@ public:
     // ---- shared with the editor ---------------------------------------------
     juce::AudioProcessorValueTreeState apvts;
 
-    tt::dsp::MeterBallistics& getOutputMeter() noexcept { return outMeter; }
-    tt::dsp::MeterBallistics& getInputMeter()  noexcept { return inMeter; }
-    tt::dsp::AnalyzerFifo&    getAnalyzer()     noexcept { return analyzer; }
+    cfm::dsp::MeterBallistics& getOutputMeter() noexcept { return outMeter; }
+    cfm::dsp::MeterBallistics& getInputMeter()  noexcept { return inMeter; }
+    cfm::dsp::AnalyzerFifo&    getAnalyzer()     noexcept { return analyzer; }
 
     float getGainReductionDb() const noexcept { return grDbAtomic.load (std::memory_order_relaxed); }
     float getAutoGainDb()      const noexcept { return autoGainDbAtomic.load (std::memory_order_relaxed); }
@@ -75,7 +75,7 @@ public:
     // Queries the EQ magnitude response (dB) for the UI curve.
     double getEqMagnitudeDb (double freqHz) noexcept
     {
-        return tt::dsp::gainToDb ((float) eq.magnitudeAt (freqHz));
+        return cfm::dsp::gainToDb ((float) eq.magnitudeAt (freqHz));
     }
 
     // A/B/C/D snapshot slots.
@@ -90,7 +90,7 @@ public:
 private:
     juce::AudioProcessorValueTreeState::ParameterLayout makeLayout()
     {
-        return tt::params::createLayout();
+        return cfm::params::createLayout();
     }
 
     void applyProgram (int index);
@@ -124,14 +124,14 @@ private:
     void cacheParams();
 
     // Modules.
-    tt::dsp::DriftModel       driftModel;
-    tt::dsp::EqualizerModule  eq;
-    tt::dsp::CompressorModule comp;
-    tt::dsp::TubeStage        tube;
-    tt::dsp::TapeModule       tape;
-    tt::dsp::StereoModule     stereo;
-    tt::dsp::MeterBallistics  inMeter, outMeter;
-    tt::dsp::AnalyzerFifo     analyzer;
+    cfm::dsp::DriftModel       driftModel;
+    cfm::dsp::EqualizerModule  eq;
+    cfm::dsp::CompressorModule comp;
+    cfm::dsp::TubeStage        tube;
+    cfm::dsp::TapeModule       tape;
+    cfm::dsp::StereoModule     stereo;
+    cfm::dsp::MeterBallistics  inMeter, outMeter;
+    cfm::dsp::AnalyzerFifo     analyzer;
 
     // Oversampling: index 0->2x, 1->4x, 2->8x. "Off" handled separately.
     std::array<std::unique_ptr<juce::dsp::Oversampling<float>>, 3> oversamplers;
@@ -162,5 +162,5 @@ private:
     std::array<juce::ValueTree, numSnapshots> snapshots;
     int activeSnapshot = 0;
 
-    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (TurboTubesAudioProcessor)
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ControlPanelAudioProcessor)
 };

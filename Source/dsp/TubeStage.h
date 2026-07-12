@@ -3,7 +3,7 @@
 #include "DspCommon.h"
 #include "DriftModel.h"
 
-namespace tt::dsp
+namespace cfm::dsp
 {
     /**
         Class-A tube / MOJO drive stage.

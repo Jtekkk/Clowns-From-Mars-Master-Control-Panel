@@ -1,6 +1,6 @@
 #include "Parameters.h"
 
-namespace tt::params
+namespace cfm::params
 {
     using APF   = juce::AudioParameterFloat;
     using APC   = juce::AudioParameterChoice;

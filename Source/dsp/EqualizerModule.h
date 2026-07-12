@@ -3,7 +3,7 @@
 #include "DspCommon.h"
 #include <array>
 
-namespace tt::dsp
+namespace cfm::dsp
 {
     /**
         Mastering-grade five-band parametric EQ.

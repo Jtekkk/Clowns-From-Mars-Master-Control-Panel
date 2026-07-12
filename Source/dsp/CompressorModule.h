@@ -4,7 +4,7 @@
 #include "DriftModel.h"
 #include <array>
 
-namespace tt::dsp
+namespace cfm::dsp
 {
     /**
         Two-stage, transformer-balanced mastering compressor.

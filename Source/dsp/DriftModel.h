@@ -3,7 +3,7 @@
 #include <juce_core/juce_core.h>
 #include <array>
 
-namespace tt::dsp
+namespace cfm::dsp
 {
     /**
         Component variation / analog drift.
@@ -12,7 +12,7 @@ namespace tt::dsp
         units — and no two channels within a unit — measure identically. That
         tiny asymmetry is a big part of why hardware sounds "wide" and alive.
 
-        Turbo Tubes reproduces this deterministically: a serial number seeds a
+        Master Control Panel reproduces this deterministically: a serial number seeds a
         reproducible PRNG that offsets every drift-sensitive parameter per
         channel. Same serial → same unit, every session ("unique digital
         fingerprint"). The `amount` knob scales how far the components have

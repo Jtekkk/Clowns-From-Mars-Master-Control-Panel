@@ -7,11 +7,11 @@
 
 /**
     Factory presets. Each is a starting point that demonstrates a different
-    facet of Turbo Tubes, so loading through them teaches what the plugin does.
+    facet of Master Control Panel, so loading through them teaches what the plugin does.
     Values are stored in real units and converted to normalised form when
     applied, so they stay readable and range-safe.
 */
-namespace tt::presets
+namespace cfm::presets
 {
     struct Preset
     {
@@ -21,7 +21,7 @@ namespace tt::presets
 
     inline const std::vector<Preset>& factory()
     {
-        using namespace tt::params::id;
+        using namespace cfm::params::id;
         static const std::vector<Preset> presets =
         {
             { "00 - Init Clean", {

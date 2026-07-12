@@ -24,3 +24,6 @@ Thumbs.db
 *.a
 *.so
 *.dylib
+
+# Installer build output
+installer/Output/

@@ -9,7 +9,7 @@
     tube-glow, and sparing splashes of clown paint (teal, signal red). Dark,
     high-contrast and legible — a control panel bolted together on Mars.
 */
-namespace tt::theme
+namespace cfm::theme
 {
     // Backgrounds — deep Martian dusk to rusted-panel browns.
     inline const juce::Colour bg0        { 0xff140b07 }; // deepest

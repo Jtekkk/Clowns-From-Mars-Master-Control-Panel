@@ -1,0 +1,74 @@
+name: Windows Installer
+
+# Builds the VST3 with MSVC on a Windows runner and packages an Inno Setup
+# installer (.exe). The installer is uploaded as a build artifact and attached
+# to a rolling "windows-latest" pre-release so it can be downloaded directly.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ claude/vst-plugin-dev-pfbhfr ]
+    paths:
+      - 'Source/**'
+      - 'CMakeLists.txt'
+      - 'installer/**'
+      - '.github/workflows/windows-installer.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure (MSVC, x64)
+        run: cmake -B build -G "Visual Studio 17 2022" -A x64 -DTT_COPY_PLUGIN=OFF
+
+      - name: Build VST3 (Release)
+        run: cmake --build build --config Release --target MasterControlPanel_VST3 --parallel
+
+      - name: Locate VST3 bundle
+        id: vst3
+        shell: pwsh
+        run: |
+          $bundle = Get-ChildItem -Path build -Recurse -Directory -Filter '*.vst3' | Select-Object -First 1
+          if (-not $bundle) { throw "VST3 bundle not found" }
+          Write-Host "Found: $($bundle.FullName)"
+          "path=$($bundle.FullName)" >> $env:GITHUB_OUTPUT
+
+      - name: Install Inno Setup
+        run: choco install innosetup --no-progress -y
+
+      - name: Build installer
+        shell: pwsh
+        run: |
+          $iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+          & $iscc "/DSourceVst3=${{ steps.vst3.outputs.path }}" installer\master-control-panel.iss
+          if ($LASTEXITCODE -ne 0) { throw "ISCC failed" }
+          Get-ChildItem installer\Output
+
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ClownsFromMars-MasterControlPanel-Windows-Installer
+          path: installer/Output/*.exe
+          if-no-files-found: error
+
+      - name: Publish rolling pre-release
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $exe = (Get-ChildItem installer\Output\*.exe | Select-Object -First 1).FullName
+          gh release delete windows-latest --yes --cleanup-tag 2>$null
+          $global:LASTEXITCODE = 0
+          gh release create windows-latest "$exe" `
+            --title "Windows Installer (latest build)" `
+            --notes "Auto-built VST3 installer (Windows x64) for Clowns From Mars Master Control Panel. Close your DAW, run the .exe, then rescan plugins." `
+            --prerelease `
+            --target $env:GITHUB_SHA

@@ -6,7 +6,7 @@
 #include "Theme.h"
 #include <functional>
 
-namespace tt::gui
+namespace cfm::gui
 {
     /**
         Real-time FFT spectrum with the live EQ response curve drawn on top.
@@ -19,7 +19,7 @@ namespace tt::gui
     class SpectrumAnalyzer : public juce::Component, private juce::Timer
     {
     public:
-        SpectrumAnalyzer (tt::dsp::AnalyzerFifo& fifoIn,
+        SpectrumAnalyzer (cfm::dsp::AnalyzerFifo& fifoIn,
                           std::function<double (double)> eqMagDbAt);
         ~SpectrumAnalyzer() override { stopTimer(); }
 
@@ -31,14 +31,14 @@ namespace tt::gui
         float freqToX (float hz, juce::Rectangle<float>) const;
         float dbToY  (float db, juce::Rectangle<float>) const;
 
-        tt::dsp::AnalyzerFifo& fifo;
+        cfm::dsp::AnalyzerFifo& fifo;
         std::function<double (double)> eqMagAt;
 
-        juce::dsp::FFT fft { tt::dsp::AnalyzerFifo::fftOrder };
-        juce::dsp::WindowingFunction<float> window { (size_t) tt::dsp::AnalyzerFifo::fftSize,
+        juce::dsp::FFT fft { cfm::dsp::AnalyzerFifo::fftOrder };
+        juce::dsp::WindowingFunction<float> window { (size_t) cfm::dsp::AnalyzerFifo::fftSize,
                                                      juce::dsp::WindowingFunction<float>::hann };
 
-        static constexpr int fftSize = tt::dsp::AnalyzerFifo::fftSize;
+        static constexpr int fftSize = cfm::dsp::AnalyzerFifo::fftSize;
         std::array<float, (size_t) fftSize * 2> fftData { {} };
         std::array<float, 256> display { {} };   // smoothed magnitude per display bin
 

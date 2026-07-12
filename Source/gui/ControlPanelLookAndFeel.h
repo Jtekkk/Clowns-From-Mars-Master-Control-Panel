@@ -3,7 +3,7 @@
 #include <juce_gui_basics/juce_gui_basics.h>
 #include "Theme.h"
 
-namespace tt::gui
+namespace cfm::gui
 {
     /**
         Rusted-brass control styling: chunky knobs with a machined pointer and
@@ -11,10 +11,10 @@ namespace tt::gui
         legible combo boxes. Everything is drawn, so there are no image assets
         to ship and it scales cleanly at any UI size.
     */
-    class TurboLookAndFeel : public juce::LookAndFeel_V4
+    class ControlPanelLookAndFeel : public juce::LookAndFeel_V4
     {
     public:
-        TurboLookAndFeel();
+        ControlPanelLookAndFeel();
 
         void drawRotarySlider (juce::Graphics&, int x, int y, int w, int h,
                                float sliderPos, float startAngle, float endAngle,

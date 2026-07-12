@@ -3,9 +3,9 @@
 #include <juce_gui_basics/juce_gui_basics.h>
 #include "Theme.h"
 
-namespace tt::gui
+namespace cfm::gui
 {
-    class TurboTubesAudioProcessorAccess;
+    class ControlPanelAudioProcessorAccess;
 
     /**
         Horizontal gain-reduction meter for the compressor. Reads the most

@@ -4,7 +4,7 @@
 #include "../dsp/Metering.h"
 #include "Theme.h"
 
-namespace tt::gui
+namespace cfm::gui
 {
     /**
         Vertical stereo output meter: filled RMS bar with a floating peak-hold
@@ -14,7 +14,7 @@ namespace tt::gui
     class LevelMeter : public juce::Component, private juce::Timer
     {
     public:
-        explicit LevelMeter (tt::dsp::MeterBallistics& src) : meter (src)
+        explicit LevelMeter (cfm::dsp::MeterBallistics& src) : meter (src)
         {
             startTimerHz (30);
         }
@@ -26,7 +26,7 @@ namespace tt::gui
         void timerCallback() override;
         float dbToY (float db, juce::Rectangle<float> area) const;
 
-        tt::dsp::MeterBallistics& meter;
+        cfm::dsp::MeterBallistics& meter;
         float peakHold[2] { -100.f, -100.f };
         int   holdCount[2] { 0, 0 };
         float rmsDb[2] { -100.f, -100.f };

@@ -1,5 +1,5 @@
 // ============================================================================
-//  Turbo Tubes verification harness (not shipped in the plugin).
+//  Master Control Panel verification harness (not shipped in the plugin).
 //
 //  1. DSP smoke test: drives the processor across sample rates, block sizes and
 //     randomised parameters, asserting the output stays finite and bounded and

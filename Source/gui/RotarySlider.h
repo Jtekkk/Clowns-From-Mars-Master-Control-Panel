@@ -3,7 +3,7 @@
 #include <juce_audio_processors/juce_audio_processors.h>
 #include "Theme.h"
 
-namespace tt::gui
+namespace cfm::gui
 {
     /**
         A labelled rotary control bound to an APVTS parameter, with the caption

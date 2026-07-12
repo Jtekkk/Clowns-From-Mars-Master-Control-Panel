@@ -2,25 +2,25 @@
 
 #include <juce_audio_processors/juce_audio_processors.h>
 #include "PluginProcessor.h"
-#include "gui/TurboLookAndFeel.h"
+#include "gui/ControlPanelLookAndFeel.h"
 #include "gui/RotarySlider.h"
 #include "gui/LevelMeter.h"
 #include "gui/GainReductionMeter.h"
 #include "gui/SpectrumAnalyzer.h"
 
 /**
-    Turbo Tubes editor.
+    Master Control Panel editor.
 
     A fixed-layout "control panel" that scales cleanly: every control lives on a
     base-size canvas which is uniformly transformed to fit the (resizable,
     aspect-locked) window, giving a crisp Scalable UI without re-flowing.
 */
-class TurboTubesAudioProcessorEditor : public juce::AudioProcessorEditor,
+class ControlPanelAudioProcessorEditor : public juce::AudioProcessorEditor,
                                        private juce::Timer
 {
 public:
-    explicit TurboTubesAudioProcessorEditor (TurboTubesAudioProcessor&);
-    ~TurboTubesAudioProcessorEditor() override;
+    explicit ControlPanelAudioProcessorEditor (ControlPanelAudioProcessor&);
+    ~ControlPanelAudioProcessorEditor() override;
 
     void resized() override;
     void paint (juce::Graphics&) override;
@@ -38,19 +38,19 @@ private:
 
     void timerCallback() override;
 
-    tt::gui::RotarySlider*  addKnob   (const char* id, const juce::String& name, juce::Colour accent);
+    cfm::gui::RotarySlider*  addKnob   (const char* id, const juce::String& name, juce::Colour accent);
     juce::ToggleButton* addToggle (const char* id, const juce::String& text, juce::Colour accent);
     juce::ComboBox*     addCombo  (const char* id, const juce::StringArray& items);
 
     void refreshSnapshotButtons();
     void selectProgram (int delta);
 
-    TurboTubesAudioProcessor& processor;
-    tt::gui::TurboLookAndFeel lnf;
+    ControlPanelAudioProcessor& processor;
+    cfm::gui::ControlPanelLookAndFeel lnf;
     Canvas canvas;
 
     // control storage
-    std::vector<std::unique_ptr<tt::gui::RotarySlider>> knobStore;
+    std::vector<std::unique_ptr<cfm::gui::RotarySlider>> knobStore;
     std::vector<std::unique_ptr<juce::ToggleButton>> toggleStore;
     std::vector<std::unique_ptr<juce::ComboBox>> comboStore;
     std::vector<std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment>>   sliderAtts;
@@ -58,13 +58,13 @@ private:
     std::vector<std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment>> comboAtts;
 
     // named controls we position explicitly
-    tt::gui::RotarySlider *kInput{}, *kOutput{}, *kHead{}, *kMix{}, *kDrift{}, *kBend{};
-    tt::gui::RotarySlider *kDrive{}, *kBias{}, *kTone{};
-    tt::gui::RotarySlider *kbFreq[5]{}, *kbGain[5]{}, *kbQ[5]{};
-    tt::gui::RotarySlider *kHP{}, *kLP{}, *kAir{}, *kTight{};
-    tt::gui::RotarySlider *kThr{}, *kRat{}, *kAtt{}, *kRel{}, *kKnee{}, *kMk{}, *kOpt{}, *kCMix{}, *kSc{};
-    tt::gui::RotarySlider *kTDrive{}, *kTLF{}, *kTHF{};
-    tt::gui::RotarySlider *kWidth{}, *kMono{};
+    cfm::gui::RotarySlider *kInput{}, *kOutput{}, *kHead{}, *kMix{}, *kDrift{}, *kBend{};
+    cfm::gui::RotarySlider *kDrive{}, *kBias{}, *kTone{};
+    cfm::gui::RotarySlider *kbFreq[5]{}, *kbGain[5]{}, *kbQ[5]{};
+    cfm::gui::RotarySlider *kHP{}, *kLP{}, *kAir{}, *kTight{};
+    cfm::gui::RotarySlider *kThr{}, *kRat{}, *kAtt{}, *kRel{}, *kKnee{}, *kMk{}, *kOpt{}, *kCMix{}, *kSc{};
+    cfm::gui::RotarySlider *kTDrive{}, *kTLF{}, *kTHF{};
+    cfm::gui::RotarySlider *kWidth{}, *kMono{};
 
     juce::ToggleButton *tBypass{}, *tDelta{}, *tAuto{}, *tTube{}, *tEq{}, *tHP{}, *tLP{}, *tPropQ{}, *tComp{}, *tAutoMk{}, *tTape{};
     juce::ComboBox *cOS{}, *cModel{}, *cMode{}, *cXfmr{}, *cSpeed{};
@@ -77,11 +77,11 @@ private:
     juce::Label      autoGainLabel;
 
     // meters / analyzer
-    std::unique_ptr<tt::gui::SpectrumAnalyzer>   analyzer;
-    std::unique_ptr<tt::gui::LevelMeter>         levelMeter;
-    std::unique_ptr<tt::gui::GainReductionMeter> grMeter;
+    std::unique_ptr<cfm::gui::SpectrumAnalyzer>   analyzer;
+    std::unique_ptr<cfm::gui::LevelMeter>         levelMeter;
+    std::unique_ptr<cfm::gui::GainReductionMeter> grMeter;
 
     static constexpr int baseW = 1120, baseH = 860;
 
-    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (TurboTubesAudioProcessorEditor)
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ControlPanelAudioProcessorEditor)
 };

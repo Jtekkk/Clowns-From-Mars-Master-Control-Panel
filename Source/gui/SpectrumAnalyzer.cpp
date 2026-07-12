@@ -1,10 +1,10 @@
 #include "SpectrumAnalyzer.h"
 
-using namespace tt;
+using namespace cfm;
 
-namespace tt::gui
+namespace cfm::gui
 {
-    SpectrumAnalyzer::SpectrumAnalyzer (tt::dsp::AnalyzerFifo& fifoIn,
+    SpectrumAnalyzer::SpectrumAnalyzer (cfm::dsp::AnalyzerFifo& fifoIn,
                                         std::function<double (double)> eqMagDbAt)
         : fifo (fifoIn), eqMagAt (std::move (eqMagDbAt))
     {

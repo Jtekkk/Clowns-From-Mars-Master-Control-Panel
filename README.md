@@ -1,8 +1,8 @@
-# TURBO TUBES
+# CLOWNS FROM MARS — Master Control Panel
 
 **An intelligent, analog-modelled mastering processor — by *Clowns From Mars***
 
-Turbo Tubes is a single-window mastering chain: corrective/tonal EQ, a
+Master Control Panel is a single-window mastering chain: corrective/tonal EQ, a
 two-stage transformer-balanced compressor, oversampled Class-A tube drive,
 tape saturation, and mid/side stereo finishing — with honest metering, matched
 A/B, and a rusted-brass "control panel bolted together on Mars" interface.
@@ -91,11 +91,11 @@ Then:
 
 ```bash
 cmake -B build -DCMAKE_BUILD_TYPE=Release
-cmake --build build --target TurboTubes_VST3 -j
-# also: --target TurboTubes_Standalone
+cmake --build build --target MasterControlPanel_VST3 -j
+# also: --target MasterControlPanel_Standalone
 ```
 
-The VST3 is written to `build/TurboTubes_artefacts/Release/VST3/` and copied to
+The VST3 is written to `build/MasterControlPanel_artefacts/Release/VST3/` and copied to
 your user plugin folder.
 
 ### Offline against a local JUCE checkout
@@ -112,6 +112,29 @@ cmake --build build --target tt_verify -j
 ./build/tt_verify ui.png     # runs DSP smoke tests, renders the UI to ui.png
 ```
 
+## Windows installer
+
+JUCE does not support MinGW, so a Windows build must be produced with MSVC on
+Windows. The `.github/workflows/windows-installer.yml` workflow does this on a
+GitHub-hosted Windows runner: it builds the VST3 with MSVC, packages an
+[Inno Setup](installer/master-control-panel.iss) installer, uploads it as a
+build artifact, and attaches it to a rolling **`windows-latest`** pre-release.
+
+- Trigger it from **Actions → Windows Installer → Run workflow**, or by pushing
+  to the dev branch.
+- Download `ClownsFromMars-MasterControlPanel-1.0.0-Windows-x64-Setup.exe` from
+  the run's artifacts or the `windows-latest` release.
+- Run it (close your DAW first). It installs the plugin to
+  `C:\Program Files\Common Files\VST3` and it appears after a plugin rescan.
+
+To build the installer locally on a Windows machine:
+
+```powershell
+cmake -B build -G "Visual Studio 17 2022" -A x64 -DTT_COPY_PLUGIN=OFF
+cmake --build build --config Release --target MasterControlPanel_VST3
+& "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer\master-control-panel.iss
+```
+
 ## Project layout
 
 ```
@@ -125,7 +148,7 @@ Source/
     DspCommon.h  DriftModel.h  TubeStage.h  EqualizerModule.h
     CompressorModule.h  TapeModule.h  StereoModule.h  Metering.h
   gui/
-    Theme.h  TurboLookAndFeel.{h,cpp}  RotarySlider.{h,cpp}
+    Theme.h  ControlPanelLookAndFeel.{h,cpp}  RotarySlider.{h,cpp}
     LevelMeter.{h,cpp}  GainReductionMeter.h  SpectrumAnalyzer.{h,cpp}
 Tools/verify_main.cpp       DSP smoke test + UI snapshot (not shipped)
 ```

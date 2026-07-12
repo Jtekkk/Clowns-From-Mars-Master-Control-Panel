@@ -4,7 +4,7 @@
 #include <atomic>
 #include <array>
 
-namespace tt::dsp
+namespace cfm::dsp
 {
     /**
         Output metering with honest reference levels.

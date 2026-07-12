@@ -3,14 +3,14 @@
 #include <juce_audio_processors/juce_audio_processors.h>
 
 /**
-    Central registry of every automatable parameter in Turbo Tubes.
+    Central registry of every automatable parameter in Master Control Panel.
 
     Keeping the IDs, ranges and layout in one place means the processor, the
     editor and the preset system can never disagree about what a control is.
     All ranges are chosen to be *musical* — the useful part of each control's
     travel maps to the sweet spot of the underlying DSP, not to raw math units.
 */
-namespace tt::params
+namespace cfm::params
 {
     // Bump this whenever the parameter layout changes in a way that would
     // invalidate saved automation, so hosts migrate cleanly.

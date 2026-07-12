@@ -2,10 +2,10 @@
 #include "gui/Theme.h"
 #include "Parameters.h"
 
-using namespace tt;
+using namespace cfm;
 
 //==============================================================================
-void TurboTubesAudioProcessorEditor::Canvas::paint (juce::Graphics& g)
+void ControlPanelAudioProcessorEditor::Canvas::paint (juce::Graphics& g)
 {
     auto full = getLocalBounds().toFloat();
 
@@ -24,11 +24,11 @@ void TurboTubesAudioProcessorEditor::Canvas::paint (juce::Graphics& g)
 
     // Header wordmark.
     g.setColour (theme::rustBright);
-    g.setFont (theme::font (34.0f, true));
-    g.drawText ("TURBO TUBES", juce::Rectangle<int> (20, 10, 480, 36), juce::Justification::centredLeft);
+    g.setFont (theme::font (29.0f, true));
+    g.drawText ("MASTER CONTROL PANEL", juce::Rectangle<int> (20, 10, 480, 36), juce::Justification::centredLeft);
     g.setColour (theme::tubeGlow.withAlpha (0.25f));
-    g.setFont (theme::font (34.0f, true));
-    g.drawText ("TURBO TUBES", juce::Rectangle<int> (21, 11, 480, 36), juce::Justification::centredLeft);
+    g.setFont (theme::font (29.0f, true));
+    g.drawText ("MASTER CONTROL PANEL", juce::Rectangle<int> (21, 11, 480, 36), juce::Justification::centredLeft);
     g.setColour (theme::textLo);
     g.setFont (theme::font (12.0f, true));
     g.drawText (juce::String::fromUTF8 ("CLOWNS FROM MARS  \xc2\xb7  INTELLIGENT MASTERING"),
@@ -56,7 +56,7 @@ void TurboTubesAudioProcessorEditor::Canvas::paint (juce::Graphics& g)
 }
 
 //==============================================================================
-gui::RotarySlider* TurboTubesAudioProcessorEditor::addKnob (const char* id, const juce::String& name, juce::Colour accent)
+gui::RotarySlider* ControlPanelAudioProcessorEditor::addKnob (const char* id, const juce::String& name, juce::Colour accent)
 {
     auto k = std::make_unique<gui::RotarySlider> (processor.apvts, id, name, accent);
     auto* raw = k.get();
@@ -65,7 +65,7 @@ gui::RotarySlider* TurboTubesAudioProcessorEditor::addKnob (const char* id, cons
     return raw;
 }
 
-juce::ToggleButton* TurboTubesAudioProcessorEditor::addToggle (const char* id, const juce::String& text, juce::Colour accent)
+juce::ToggleButton* ControlPanelAudioProcessorEditor::addToggle (const char* id, const juce::String& text, juce::Colour accent)
 {
     auto b = std::make_unique<juce::ToggleButton> (text);
     auto* raw = b.get();
@@ -76,7 +76,7 @@ juce::ToggleButton* TurboTubesAudioProcessorEditor::addToggle (const char* id, c
     return raw;
 }
 
-juce::ComboBox* TurboTubesAudioProcessorEditor::addCombo (const char* id, const juce::StringArray& items)
+juce::ComboBox* ControlPanelAudioProcessorEditor::addCombo (const char* id, const juce::StringArray& items)
 {
     auto c = std::make_unique<juce::ComboBox>();
     auto* raw = c.get();
@@ -88,13 +88,13 @@ juce::ComboBox* TurboTubesAudioProcessorEditor::addCombo (const char* id, const 
 }
 
 //==============================================================================
-TurboTubesAudioProcessorEditor::TurboTubesAudioProcessorEditor (TurboTubesAudioProcessor& p)
+ControlPanelAudioProcessorEditor::ControlPanelAudioProcessorEditor (ControlPanelAudioProcessor& p)
     : AudioProcessorEditor (&p), processor (p)
 {
     setLookAndFeel (&lnf);
     addAndMakeVisible (canvas);
 
-    using namespace tt::params;
+    using namespace cfm::params;
 
     // ---- Global -----------------------------------------------------------
     kInput  = addKnob (id::inputTrim,   "INPUT",    theme::brass);
@@ -228,18 +228,18 @@ TurboTubesAudioProcessorEditor::TurboTubesAudioProcessorEditor (TurboTubesAudioP
     startTimerHz (12);
 }
 
-TurboTubesAudioProcessorEditor::~TurboTubesAudioProcessorEditor()
+ControlPanelAudioProcessorEditor::~ControlPanelAudioProcessorEditor()
 {
     setLookAndFeel (nullptr);
 }
 
 //==============================================================================
-void TurboTubesAudioProcessorEditor::paint (juce::Graphics& g)
+void ControlPanelAudioProcessorEditor::paint (juce::Graphics& g)
 {
     g.fillAll (theme::bg0);   // letterbox behind the scaled canvas
 }
 
-void TurboTubesAudioProcessorEditor::timerCallback()
+void ControlPanelAudioProcessorEditor::timerCallback()
 {
     if (analyzer) analyzer->setSampleRate (processor.getSampleRate() > 0 ? processor.getSampleRate() : 48000.0);
 
@@ -251,7 +251,7 @@ void TurboTubesAudioProcessorEditor::timerCallback()
     refreshSnapshotButtons();
 }
 
-void TurboTubesAudioProcessorEditor::refreshSnapshotButtons()
+void ControlPanelAudioProcessorEditor::refreshSnapshotButtons()
 {
     for (int i = 0; i < 4; ++i)
     {
@@ -262,7 +262,7 @@ void TurboTubesAudioProcessorEditor::refreshSnapshotButtons()
     }
 }
 
-void TurboTubesAudioProcessorEditor::selectProgram (int delta)
+void ControlPanelAudioProcessorEditor::selectProgram (int delta)
 {
     const int n = processor.getNumPrograms();
     if (n <= 0) return;
@@ -272,7 +272,7 @@ void TurboTubesAudioProcessorEditor::selectProgram (int delta)
 }
 
 //==============================================================================
-void TurboTubesAudioProcessorEditor::resized()
+void ControlPanelAudioProcessorEditor::resized()
 {
     // Scale the fixed-size canvas to fit while keeping aspect ratio.
     const float scale = juce::jmin ((float) getWidth() / baseW, (float) getHeight() / baseH);

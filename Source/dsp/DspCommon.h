@@ -4,11 +4,11 @@
 #include <cmath>
 
 /**
-    Small shared helpers used across the Turbo Tubes DSP modules.
+    Small shared helpers used across the Master Control Panel DSP modules.
 
     Everything here is real-time safe: no allocation, no locking, no logging.
 */
-namespace tt::dsp
+namespace cfm::dsp
 {
     // Fast, branch-free denormal guard. We also flush denormals globally via
     // juce::ScopedNoDenormals in the processor, but individual feedback paths

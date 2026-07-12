@@ -1,8 +1,8 @@
 #include "RotarySlider.h"
 
-using namespace tt;
+using namespace cfm;
 
-namespace tt::gui
+namespace cfm::gui
 {
     RotarySlider::RotarySlider (juce::AudioProcessorValueTreeState& state,
                                 const juce::String& paramID,

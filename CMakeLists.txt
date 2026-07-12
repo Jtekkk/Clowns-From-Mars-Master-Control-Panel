@@ -1,10 +1,10 @@
 cmake_minimum_required(VERSION 3.22)
 
 # ============================================================================
-#  TURBO TUBES  —  Intelligent analog-modelled mastering processor
+#  CLOWNS FROM MARS · MASTER CONTROL PANEL  —  Intelligent analog-modelled mastering processor
 #  "Clowns From Mars" master control panel
 # ============================================================================
-project(TurboTubes VERSION 1.0.0 LANGUAGES C CXX)
+project(MasterControlPanel VERSION 1.0.0 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -15,6 +15,8 @@ endif()
 
 # Interprocedural optimisation (LTO) for release audio builds when supported.
 option(TT_ENABLE_LTO "Enable link-time optimisation for release builds" OFF)
+# Copy the built plugin into the user plugin folder (disable on CI packaging).
+option(TT_COPY_PLUGIN "Copy plugin to the user plugin folder after build" ON)
 
 # ----------------------------------------------------------------------------
 #  JUCE
@@ -35,46 +37,46 @@ FetchContent_MakeAvailable(JUCE)
 # ----------------------------------------------------------------------------
 #  Plugin target
 # ----------------------------------------------------------------------------
-juce_add_plugin(TurboTubes
+juce_add_plugin(MasterControlPanel
     COMPANY_NAME              "Clowns From Mars"
     COMPANY_WEBSITE           "https://clownsfrommars.audio"
-    BUNDLE_ID                 "audio.clownsfrommars.turbotubes"
+    BUNDLE_ID                 "audio.clownsfrommars.mastercontrolpanel"
     PLUGIN_MANUFACTURER_CODE  Cfm0
-    PLUGIN_CODE               Ttub
+    PLUGIN_CODE               Cmcp
     FORMATS                   VST3 Standalone
-    PRODUCT_NAME              "Turbo Tubes"
+    PRODUCT_NAME              "Clowns From Mars Master Control Panel"
     DESCRIPTION               "Intelligent analog-modelled mastering processor"
     IS_SYNTH                  FALSE
     NEEDS_MIDI_INPUT          FALSE
     NEEDS_MIDI_OUTPUT         FALSE
     IS_MIDI_EFFECT            FALSE
     EDITOR_WANTS_KEYBOARD_FOCUS FALSE
-    COPY_PLUGIN_AFTER_BUILD   TRUE
+    COPY_PLUGIN_AFTER_BUILD   ${TT_COPY_PLUGIN}
     VST3_CATEGORIES           "Fx" "Mastering" "EQ" "Dynamics"
     AU_MAIN_TYPE              "kAudioUnitType_Effect"
     VST_NUM_MIDI_INPUTS       0
     VST_NUM_MIDI_OUTPUTS      0)
 
-juce_generate_juce_header(TurboTubes)
+juce_generate_juce_header(MasterControlPanel)
 
 # ----------------------------------------------------------------------------
 #  Sources
 # ----------------------------------------------------------------------------
-target_sources(TurboTubes PRIVATE
+target_sources(MasterControlPanel PRIVATE
     Source/PluginProcessor.cpp
     Source/PluginEditor.cpp
     Source/Parameters.cpp
-    Source/gui/TurboLookAndFeel.cpp
+    Source/gui/ControlPanelLookAndFeel.cpp
     Source/gui/RotarySlider.cpp
     Source/gui/LevelMeter.cpp
     Source/gui/SpectrumAnalyzer.cpp)
 
-target_include_directories(TurboTubes PRIVATE Source)
+target_include_directories(MasterControlPanel PRIVATE Source)
 
 # ----------------------------------------------------------------------------
 #  Compile definitions
 # ----------------------------------------------------------------------------
-target_compile_definitions(TurboTubes PUBLIC
+target_compile_definitions(MasterControlPanel PUBLIC
     JUCE_WEB_BROWSER=0
     JUCE_USE_CURL=0
     JUCE_VST3_CAN_REPLACE_VST2=0
@@ -86,7 +88,7 @@ target_compile_definitions(TurboTubes PUBLIC
 
 # Aggressive but safe optimisation for the audio DSP.
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
-    target_compile_options(TurboTubes PRIVATE
+    target_compile_options(MasterControlPanel PRIVATE
         $<$<CONFIG:Release>:-O3 -ffast-math -fno-finite-math-only>)
 endif()
 
@@ -94,14 +96,14 @@ if(TT_ENABLE_LTO)
     include(CheckIPOSupported)
     check_ipo_supported(RESULT _ipo_ok OUTPUT _ipo_msg)
     if(_ipo_ok)
-        set_target_properties(TurboTubes PROPERTIES INTERPROCEDURAL_OPTIMIZATION TRUE)
+        set_target_properties(MasterControlPanel PROPERTIES INTERPROCEDURAL_OPTIMIZATION TRUE)
     endif()
 endif()
 
 # ----------------------------------------------------------------------------
 #  JUCE modules
 # ----------------------------------------------------------------------------
-target_link_libraries(TurboTubes PRIVATE
+target_link_libraries(MasterControlPanel PRIVATE
     juce::juce_audio_utils
     juce::juce_audio_processors
     juce::juce_dsp
@@ -118,7 +120,7 @@ option(TT_BUILD_VERIFY "Build the internal verification/snapshot tool" OFF)
 if(TT_BUILD_VERIFY)
     add_executable(tt_verify Tools/verify_main.cpp)
     target_link_libraries(tt_verify PRIVATE
-        TurboTubes
+        MasterControlPanel
         juce::juce_audio_utils
         juce::juce_dsp
         juce::juce_gui_extra

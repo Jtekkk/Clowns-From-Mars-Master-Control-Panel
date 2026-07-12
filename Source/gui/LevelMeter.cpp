@@ -1,8 +1,8 @@
 #include "LevelMeter.h"
 
-using namespace tt;
+using namespace cfm;
 
-namespace tt::gui
+namespace cfm::gui
 {
     float LevelMeter::dbToY (float db, juce::Rectangle<float> area) const
     {

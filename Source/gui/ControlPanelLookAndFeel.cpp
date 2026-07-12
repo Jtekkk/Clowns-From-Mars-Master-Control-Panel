@@ -1,10 +1,10 @@
-#include "TurboLookAndFeel.h"
+#include "ControlPanelLookAndFeel.h"
 
-using namespace tt;
+using namespace cfm;
 
-namespace tt::gui
+namespace cfm::gui
 {
-    TurboLookAndFeel::TurboLookAndFeel()
+    ControlPanelLookAndFeel::ControlPanelLookAndFeel()
     {
         setColour (juce::Slider::textBoxTextColourId,       theme::textHi);
         setColour (juce::Slider::textBoxOutlineColourId,    juce::Colours::transparentBlack);
@@ -23,7 +23,7 @@ namespace tt::gui
         setColour (juce::TextButton::textColourOnId,        theme::textHi);
     }
 
-    void TurboLookAndFeel::drawRotarySlider (juce::Graphics& g, int x, int y, int w, int h,
+    void ControlPanelLookAndFeel::drawRotarySlider (juce::Graphics& g, int x, int y, int w, int h,
                                              float sliderPos, float startAngle, float endAngle,
                                              juce::Slider& s)
     {
@@ -87,7 +87,7 @@ namespace tt::gui
         g.drawEllipse (cap, 1.0f);
     }
 
-    void TurboLookAndFeel::drawToggleButton (juce::Graphics& g, juce::ToggleButton& b,
+    void ControlPanelLookAndFeel::drawToggleButton (juce::Graphics& g, juce::ToggleButton& b,
                                              bool highlighted, bool /*down*/)
     {
         auto bounds = b.getLocalBounds().toFloat();
@@ -119,7 +119,7 @@ namespace tt::gui
         }
     }
 
-    void TurboLookAndFeel::drawButtonBackground (juce::Graphics& g, juce::Button& b,
+    void ControlPanelLookAndFeel::drawButtonBackground (juce::Graphics& g, juce::Button& b,
                                                  const juce::Colour& /*bg*/, bool highlighted, bool down)
     {
         auto r = b.getLocalBounds().toFloat().reduced (1.0f);
@@ -136,7 +136,7 @@ namespace tt::gui
         g.drawRoundedRectangle (r, 4.0f, 1.0f);
     }
 
-    void TurboLookAndFeel::drawButtonText (juce::Graphics& g, juce::TextButton& b, bool, bool)
+    void ControlPanelLookAndFeel::drawButtonText (juce::Graphics& g, juce::TextButton& b, bool, bool)
     {
         g.setColour (b.findColour (b.getToggleState() ? juce::TextButton::textColourOnId
                                                       : juce::TextButton::textColourOffId));
@@ -144,7 +144,7 @@ namespace tt::gui
         g.drawFittedText (b.getButtonText(), b.getLocalBounds(), juce::Justification::centred, 1);
     }
 
-    void TurboLookAndFeel::drawComboBox (juce::Graphics& g, int width, int height, bool,
+    void ControlPanelLookAndFeel::drawComboBox (juce::Graphics& g, int width, int height, bool,
                                          int, int, int, int, juce::ComboBox& box)
     {
         auto r = juce::Rectangle<int> (0, 0, width, height).toFloat().reduced (1.0f);
@@ -162,14 +162,14 @@ namespace tt::gui
         g.strokePath (arrow, juce::PathStrokeType (1.6f));
     }
 
-    void TurboLookAndFeel::positionComboBoxText (juce::ComboBox& box, juce::Label& label)
+    void ControlPanelLookAndFeel::positionComboBoxText (juce::ComboBox& box, juce::Label& label)
     {
         label.setBounds (8, 1, box.getWidth() - 26, box.getHeight() - 2);
         label.setFont (getComboBoxFont (box));
         label.setJustificationType (juce::Justification::centredLeft);
     }
 
-    void TurboLookAndFeel::drawPopupMenuBackground (juce::Graphics& g, int width, int height)
+    void ControlPanelLookAndFeel::drawPopupMenuBackground (juce::Graphics& g, int width, int height)
     {
         g.setColour (theme::bg1);
         g.fillRect (0, 0, width, height);
