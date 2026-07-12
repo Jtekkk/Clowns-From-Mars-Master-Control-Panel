@@ -20,6 +20,7 @@ permissions:
 jobs:
   build-windows:
     runs-on: windows-latest
+    timeout-minutes: 30
     env:
       CMAKE_BUILD_PARALLEL_LEVEL: "4"
 
