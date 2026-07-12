@@ -60,6 +60,11 @@ juce_add_plugin(MasterControlPanel
 juce_generate_juce_header(MasterControlPanel)
 
 # ----------------------------------------------------------------------------
+#  Embedded art (Mars clown) — becomes BinaryData::clown_jpg
+# ----------------------------------------------------------------------------
+juce_add_binary_data(MasterControlPanelData SOURCES Resources/clown.jpg)
+
+# ----------------------------------------------------------------------------
 #  Sources
 # ----------------------------------------------------------------------------
 target_sources(MasterControlPanel PRIVATE
@@ -106,6 +111,7 @@ endif()
 #  JUCE modules
 # ----------------------------------------------------------------------------
 target_link_libraries(MasterControlPanel PRIVATE
+    MasterControlPanelData
     juce::juce_audio_utils
     juce::juce_audio_processors
     juce::juce_dsp
@@ -125,6 +131,7 @@ if(TT_BUILD_VERIFY)
     add_executable(tt_verify Tools/verify_main.cpp)
     target_link_libraries(tt_verify PRIVATE
         MasterControlPanel
+        MasterControlPanelData
         juce::juce_audio_utils
         juce::juce_dsp
         juce::juce_gui_extra

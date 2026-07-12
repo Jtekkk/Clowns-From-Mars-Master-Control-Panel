@@ -196,6 +196,48 @@ int main (int argc, char** argv)
         proc->setProcessingPrecision (juce::AudioProcessor::singlePrecision);
     }
 
+    // (5) Linear-phase EQ path: enable it with a boost, confirm finite output
+    //     and that it reports latency (the FIR group delay).
+    {
+        auto findParam = [&] (const juce::String& nm) -> juce::AudioProcessorParameter*
+        {
+            for (auto* p : params) if (p->getName (64).equalsIgnoreCase (nm)) return p;
+            return nullptr;
+        };
+        for (auto* p : params) p->setValueNotifyingHost (p->getDefaultValue());
+        if (auto* q = findParam ("EQ On"))        q->setValueNotifyingHost (1.0f);
+        if (auto* q = findParam ("Linear Phase")) q->setValueNotifyingHost (1.0f);
+        if (auto* q = findParam ("High Mid On"))  q->setValueNotifyingHost (1.0f);
+        if (auto* q = findParam ("High Mid Gain"))q->setValueNotifyingHost (0.85f);
+
+        const double sr = 48000.0; const int block = 256;
+        proc->setProcessingPrecision (juce::AudioProcessor::singlePrecision);
+        proc->setPlayConfigDetails (2, 2, sr, block);
+        proc->prepareToPlay (sr, block);
+        juce::AudioBuffer<float> buf (2, block);
+        juce::MidiBuffer midi;
+        bool lfin = true; double lmax = 0.0;
+        for (int iter = 0; iter < 200; ++iter)
+        {
+            for (int ch = 0; ch < 2; ++ch)
+            {
+                auto* d = buf.getWritePointer (ch);
+                for (int n = 0; n < block; ++n)
+                {
+                    const float t = (float) ((iter * block + n) / sr);
+                    d[n] = 0.3f * std::sin (juce::MathConstants<float>::twoPi * 1000.0f * t);
+                }
+            }
+            proc->processBlock (buf, midi);
+            for (int ch = 0; ch < 2; ++ch) { auto* d = buf.getReadPointer (ch);
+                for (int n = 0; n < block; ++n) { if (! std::isfinite (d[n])) lfin = false;
+                    lmax = juce::jmax (lmax, (double) std::abs (d[n])); } }
+        }
+        std::printf ("  linear-phase EQ: finite=%s peak=%.3f latency=%d\n",
+                     lfin ? "yes" : "NO", lmax, proc->getLatencySamples());
+        if (! lfin || proc->getLatencySamples() <= 0) ok = false;
+    }
+
     std::printf ("DSP verification: %s  (fuzz finite ok, fuzzMaxAbs=%.2f, worstLatency=%d)\n",
                  ok ? "PASS" : "FAIL", fuzzMaxAbs, worstLatency);
 
@@ -204,7 +246,7 @@ int main (int argc, char** argv)
                                       : juce::String ("turbo_tubes_ui.png");
     if (auto* editor = proc->createEditorIfNeeded())
     {
-        editor->setSize (1120, 860);
+        editor->setSize (1360, 860);
         juce::Image img = editor->createComponentSnapshot (editor->getLocalBounds(), false, 1.0f);
 
         juce::File out (juce::File::getCurrentWorkingDirectory().getChildFile (outPath));

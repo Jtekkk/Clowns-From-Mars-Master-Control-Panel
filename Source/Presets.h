@@ -47,7 +47,7 @@ namespace cfm::presets
                 { headroom, -3 }, { air, 20 }, { tight, 20 } } },
 
             { "04 - Airy Master", {
-                { air, 45 }, { bandGain[4], 3 }, { bandFreq[4], 12000 }, { bandOn[4], 1 },
+                { eqOn, 1 }, { eqLinear, 1 }, { air, 45 }, { bandGain[4], 3 }, { bandFreq[4], 12000 }, { bandOn[4], 1 },
                 { width, 115 }, { tubeOn, 1 }, { tubeModel, 0 }, { tubeDrive, 25 },
                 { compOn, 1 }, { compThresh, -14 }, { compRatio, 1.6f }, { tapeOn, 0 } } },
 
@@ -202,7 +202,7 @@ namespace cfm::presets
 
             { "21 - Radio Ready Sheen", {
                 { inputTrim, 0 }, { headroom, 3 }, { autoGain, 1 }, { oversample, 1 },
-                { eqOn, 1 }, { hpOn, 1 }, { hpFreq, 30 }, { tight, 22 },
+                { eqOn, 1 }, { eqLinear, 1 }, { hpOn, 1 }, { hpFreq, 30 }, { tight, 22 },
                 { air, 40 }, { bandOn[3], 1 }, { bandFreq[3], 5000 }, { bandGain[3], 2 },
                 { bandQ[3], 0.9f }, { compOn, 1 }, { compThresh, -18 }, { compRatio, 2 },
                 { compAttack, 30 }, { compRelease, 180 }, { compKnee, 8 }, { compAutoMk, 1 },
@@ -211,7 +211,7 @@ namespace cfm::presets
 
             { "22 - Modern Pop Gloss", {
                 { inputTrim, 0 }, { headroom, 5 }, { autoGain, 1 }, { oversample, 1 },
-                { eqOn, 1 }, { hpOn, 1 }, { hpFreq, 28 }, { air, 48 },
+                { eqOn, 1 }, { eqLinear, 1 }, { hpOn, 1 }, { hpFreq, 28 }, { air, 48 },
                 { bandOn[0], 1 }, { bandFreq[0], 80 }, { bandGain[0], 2 }, { bandQ[0], 0.7f },
                 { compOn, 1 }, { compThresh, -20 }, { compRatio, 3 }, { compAttack, 15 },
                 { compRelease, 150 }, { compKnee, 6 }, { compAutoMk, 1 }, { compMode, 2 },
@@ -302,21 +302,22 @@ namespace cfm::presets
                 { autoGain, 1 }, { mix, 100 } } },
 
             { "33 - Transparent Bus Glue", {
-                { oversample, 1 }, { autoGain, 1 }, { mix, 100 }, { compOn, 1 },
+                { oversample, 1 }, { autoGain, 1 }, { mix, 100 }, { tubeOn, 0 },
+                { eqOn, 1 }, { eqLinear, 1 }, { tight, 12 }, { compOn, 1 },
                 { compThresh, -20 }, { compRatio, 2 }, { compAttack, 30 }, { compRelease, 250 },
                 { compKnee, 8 }, { compAutoMk, 1 }, { compOptBlend, 85 }, { compMode, 0 },
                 { scHpf, 90 }, { transformer, 0 } } },
 
             { "34 - Low End Anchor", {
-                { oversample, 1 }, { autoGain, 1 }, { eqOn, 1 }, { hpOn, 1 },
-                { hpFreq, 28 }, { tight, 45 }, { bandOn[0], 1 }, { bandFreq[0], 80 },
+                { oversample, 2 }, { autoGain, 1 }, { eqOn, 1 }, { eqLinear, 1 },
+                { hpOn, 1 }, { hpFreq, 28 }, { tight, 45 }, { bandOn[0], 1 }, { bandFreq[0], 80 },
                 { bandGain[0], -2 }, { bandQ[0], 0.7f }, { monoFreq, 120 }, { compOn, 1 },
                 { compThresh, -18 }, { compRatio, 2 }, { compAttack, 40 }, { compRelease, 200 },
                 { compKnee, 6 }, { compMode, 2 }, { compAutoMk, 1 }, { scHpf, 120 } } },
 
             { "35 - Wide Open Master", {
                 { oversample, 1 }, { autoGain, 1 }, { width, 135 }, { drift, 15 },
-                { monoFreq, 100 }, { eqOn, 1 }, { air, 25 }, { bandOn[4], 1 },
+                { monoFreq, 100 }, { eqOn, 1 }, { eqLinear, 1 }, { air, 25 }, { bandOn[4], 1 },
                 { bandFreq[4], 12000 }, { bandGain[4], 1.5f }, { bandQ[4], 0.7f } } },
 
             { "36 - Finish Line Polish", {
@@ -325,6 +326,66 @@ namespace cfm::presets
                 { compAutoMk, 1 }, { compOptBlend, 25 }, { scHpf, 100 }, { tubeOn, 1 },
                 { tubeModel, 0 }, { tubeDrive, 15 }, { tapeOn, 1 }, { tapeDrive, 18 },
                 { tapeSpeed, 1 }, { outputTrim, -0.3f } } },
+
+            // ---- Linear-phase mastering showcase (zero phase smear) -------------
+            { "37 - Linear Master Glue", {
+                { oversample, 2 }, { autoGain, 1 }, { headroom, 3 }, { mix, 100 },
+                { tubeOn, 0 }, { eqOn, 1 }, { eqLinear, 1 }, { hpOn, 1 }, { hpFreq, 28 },
+                { tight, 15 }, { air, 20 }, { bandOn[4], 1 }, { bandFreq[4], 12000 },
+                { bandGain[4], 1.2f }, { bandQ[4], 0.7f }, { compOn, 1 }, { compThresh, -16 },
+                { compRatio, 1.8f }, { compAttack, 30 }, { compRelease, 250 }, { compKnee, 8 },
+                { compAutoMk, 1 }, { compMode, 0 }, { compOptBlend, 80 }, { scHpf, 90 },
+                { transformer, 0 }, { width, 105 } } },
+
+            { "38 - Phase-Pure Low Anchor", {
+                { oversample, 2 }, { autoGain, 1 }, { mix, 100 }, { eqOn, 1 },
+                { eqLinear, 1 }, { hpOn, 1 }, { hpFreq, 26 }, { tight, 35 },
+                { bandOn[0], 1 }, { bandFreq[0], 60 }, { bandGain[0], 2.5f }, { bandQ[0], 0.7f },
+                { monoFreq, 110 }, { compOn, 1 }, { compThresh, -18 }, { compRatio, 2 },
+                { compAttack, 40 }, { compRelease, 200 }, { compKnee, 6 }, { compMode, 2 },
+                { compAutoMk, 1 }, { scHpf, 120 }, { transformer, 0 }, { tubeOn, 1 },
+                { tubeModel, 0 }, { tubeDrive, 14 }, { tubeBias, 10 }, { width, 118 } } },
+
+            { "39 - Streaming Master -14", {
+                { oversample, 2 }, { autoGain, 1 }, { headroom, 2 }, { mix, 100 },
+                { eqOn, 1 }, { eqLinear, 1 }, { hpOn, 1 }, { hpFreq, 30 }, { tight, 20 },
+                { air, 28 }, { bandOn[3], 1 }, { bandFreq[3], 5000 }, { bandGain[3], 1.5f },
+                { bandQ[3], 0.9f }, { compOn, 1 }, { compThresh, -14 }, { compRatio, 2.5f },
+                { compAttack, 20 }, { compRelease, 160 }, { compKnee, 6 }, { compAutoMk, 1 },
+                { compMode, 0 }, { compOptBlend, 55 }, { scHpf, 95 }, { transformer, 0 },
+                { tubeOn, 1 }, { tubeModel, 0 }, { tubeDrive, 16 }, { tubeBias, 12 },
+                { tubeTone, 8 }, { tapeOn, 1 }, { tapeDrive, 14 }, { tapeSpeed, 1 },
+                { tapeHF, -0.5f }, { width, 108 } } },
+
+            { "40 - Crystalline Air", {
+                { oversample, 2 }, { autoGain, 1 }, { mix, 100 }, { tubeOn, 0 },
+                { eqOn, 1 }, { eqLinear, 1 }, { hpOn, 1 }, { hpFreq, 30 }, { air, 42 },
+                { bandOn[4], 1 }, { bandFreq[4], 14000 }, { bandGain[4], 2.5f }, { bandQ[4], 0.7f },
+                { bandOn[2], 1 }, { bandFreq[2], 3000 }, { bandGain[2], 1 }, { bandQ[2], 0.8f },
+                { compOn, 1 }, { compThresh, -16 }, { compRatio, 1.8f }, { compAttack, 30 },
+                { compRelease, 220 }, { compKnee, 8 }, { compAutoMk, 1 }, { compOptBlend, 85 },
+                { scHpf, 90 }, { transformer, 1 }, { width, 120 }, { monoFreq, 90 } } },
+
+            { "41 - Mid/Side Master", {
+                { oversample, 2 }, { autoGain, 1 }, { mix, 100 }, { eqOn, 1 },
+                { eqLinear, 1 }, { hpOn, 1 }, { hpFreq, 28 }, { air, 24 }, { tight, 18 },
+                { bandOn[1], 1 }, { bandFreq[1], 320 }, { bandGain[1], -1.5f }, { bandQ[1], 1.2f },
+                { compOn, 1 }, { compThresh, -18 }, { compRatio, 2 }, { compAttack, 30 },
+                { compRelease, 200 }, { compKnee, 8 }, { compMode, 2 }, { compAutoMk, 1 },
+                { compOptBlend, 70 }, { scHpf, 100 }, { transformer, 1 }, { tubeOn, 1 },
+                { tubeModel, 0 }, { tubeDrive, 12 }, { tubeBias, 10 }, { width, 125 },
+                { monoFreq, 100 } } },
+
+            { "42 - Cinematic Wide", {
+                { oversample, 2 }, { autoGain, 1 }, { mix, 100 }, { drift, 12 },
+                { eqOn, 1 }, { eqLinear, 1 }, { hpOn, 1 }, { hpFreq, 24 }, { air, 30 },
+                { tight, 12 }, { bandOn[0], 1 }, { bandFreq[0], 70 }, { bandGain[0], 1.5f },
+                { bandQ[0], 0.7f }, { bandOn[4], 1 }, { bandFreq[4], 13000 }, { bandGain[4], 1.8f },
+                { bandQ[4], 0.7f }, { compOn, 1 }, { compThresh, -20 }, { compRatio, 1.6f },
+                { compAttack, 40 }, { compRelease, 300 }, { compKnee, 10 }, { compAutoMk, 1 },
+                { compOptBlend, 90 }, { scHpf, 85 }, { transformer, 0 }, { tubeOn, 1 },
+                { tubeModel, 0 }, { tubeDrive, 10 }, { tubeBias, 8 }, { width, 140 },
+                { monoFreq, 90 } } },
         };
         return presets;
     }

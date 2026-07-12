@@ -46,6 +46,7 @@ namespace cfm::params
         add (new APB (pid (id::lpOn),  "LP On",  false));
         add (new APF (pid (id::lpFreq),"Low-Pass",  freqRange (2000.f, 22000.f, 12000.f), 20000.f, hz()));
         add (new APB (pid (id::propQ), "Proportional Q", true));
+        add (new APB (pid (id::eqLinear), "Linear Phase", false));
         add (new APF (pid (id::air),   "AIR",   juce::NormalisableRange<float> (0.f, 100.f, 0.1f), 0.f, pct()));
         add (new APF (pid (id::tight), "TIGHT", juce::NormalisableRange<float> (0.f, 100.f, 0.1f), 0.f, pct()));
 

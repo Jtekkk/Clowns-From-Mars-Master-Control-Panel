@@ -1,8 +1,53 @@
 #include "PluginEditor.h"
 #include "gui/Theme.h"
 #include "Parameters.h"
+#include "BinaryData.h"
 
 using namespace cfm;
+
+//==============================================================================
+void ControlPanelAudioProcessorEditor::ArtPanel::paint (juce::Graphics& g)
+{
+    auto r = getLocalBounds().toFloat();
+    g.setColour (theme::bg0);
+    g.fillRoundedRectangle (r, 6.0f);
+
+    if (image.isValid())
+    {
+        auto dst = r.reduced (2.0f);
+        juce::Path clip; clip.addRoundedRectangle (dst, 5.0f);
+        g.saveState();
+        g.reduceClipRegion (clip);
+
+        // Cover-fit: fill the panel, cropping the overflow (centred).
+        const float dr = dst.getWidth() / dst.getHeight();
+        const float ir = image.getWidth() / (float) image.getHeight();
+        juce::Rectangle<int> src;
+        if (ir > dr) { const int w = juce::roundToInt (image.getHeight() * dr);
+                       src = { (image.getWidth() - w) / 2, 0, w, image.getHeight() }; }
+        else         { const int h = juce::roundToInt (image.getWidth() / dr);
+                       src = { 0, (image.getHeight() - h) / 2, image.getWidth(), h }; }
+        g.drawImage (image, dst.getX(), dst.getY(), dst.getWidth(), dst.getHeight(),
+                     src.getX(), src.getY(), src.getWidth(), src.getHeight());
+
+        // Warm scrim top & bottom so overlaid chrome stays legible and it reads
+        // as part of the panel rather than a pasted photo.
+        juce::ColourGradient scrim (theme::bg0.withAlpha (0.55f), 0.0f, dst.getY(),
+                                    theme::bg0.withAlpha (0.0f), 0.0f, dst.getY() + 90.0f, false);
+        g.setGradientFill (scrim); g.fillRect (dst.withHeight (90.0f));
+        juce::ColourGradient scrim2 (theme::bg0.withAlpha (0.0f), 0.0f, dst.getBottom() - 60.0f,
+                                     theme::bg0.withAlpha (0.7f), 0.0f, dst.getBottom(), false);
+        g.setGradientFill (scrim2); g.fillRect (dst.withY (dst.getBottom() - 60.0f).withHeight (60.0f));
+        g.restoreState();
+    }
+
+    g.setColour (theme::brass.withAlpha (0.6f));
+    g.drawRoundedRectangle (r.reduced (1.0f), 6.0f, 1.5f);
+    g.setColour (theme::textMid);
+    g.setFont (theme::font (10.5f, true));
+    g.drawText ("CLOWNS FROM MARS", getLocalBounds().removeFromBottom (20),
+                juce::Justification::centred);
+}
 
 //==============================================================================
 void ControlPanelAudioProcessorEditor::Canvas::paint (juce::Graphics& g)
@@ -116,10 +161,11 @@ ControlPanelAudioProcessorEditor::ControlPanelAudioProcessorEditor (ControlPanel
     tTube  = addToggle (id::tubeOn,    "ON",    theme::tubeGlow);
 
     // ---- EQ ---------------------------------------------------------------
-    tEq    = addToggle (id::eqOn,  "ON",  theme::clownTeal);
-    tHP    = addToggle (id::hpOn,  "HPF", theme::clownTeal);
-    tLP    = addToggle (id::lpOn,  "LPF", theme::clownTeal);
-    tPropQ = addToggle (id::propQ, "P-Q", theme::clownTeal);
+    tEq     = addToggle (id::eqOn,     "ON",  theme::clownTeal);
+    tHP     = addToggle (id::hpOn,     "HPF", theme::clownTeal);
+    tLP     = addToggle (id::lpOn,     "LPF", theme::clownTeal);
+    tPropQ  = addToggle (id::propQ,    "P-Q", theme::clownTeal);
+    tLinear = addToggle (id::eqLinear, "LIN-PHASE", theme::clownRed);
     kHP    = addKnob (id::hpFreq, "HP", theme::clownTeal);
     kLP    = addKnob (id::lpFreq, "LP", theme::clownTeal);
     kAir   = addKnob (id::air,    "AIR", theme::clownTeal);
@@ -215,6 +261,34 @@ ControlPanelAudioProcessorEditor::ControlPanelAudioProcessorEditor (ControlPanel
     grMeter = std::make_unique<gui::GainReductionMeter> ([this] { return processor.getGainReductionDb(); });
     canvas.addAndMakeVisible (*grMeter);
 
+    // ---- Right-side art (Mars clown) --------------------------------------
+    artPanel.image = juce::ImageCache::getFromMemory (BinaryData::clown_jpg, BinaryData::clown_jpgSize);
+    canvas.addAndMakeVisible (artPanel);
+
+    // ---- Loudness (LUFS) readout ------------------------------------------
+    lufsCaption.setText (juce::String::fromUTF8 ("LOUDNESS  \xc2\xb7  LUFS"), juce::dontSendNotification);
+    lufsCaption.setFont (theme::font (10.5f, true));
+    lufsCaption.setColour (juce::Label::textColourId, theme::textMid);
+    lufsCaption.setJustificationType (juce::Justification::centredLeft);
+    canvas.addAndMakeVisible (lufsCaption);
+
+    auto styleL = [this] (juce::Label& l, juce::Colour c)
+    {
+        l.setJustificationType (juce::Justification::centredLeft);
+        l.setColour (juce::Label::textColourId, c);
+        l.setFont (theme::font (13.0f, true));
+        canvas.addAndMakeVisible (l);
+    };
+    styleL (lufsM, theme::clownTeal);
+    styleL (lufsS, theme::tubeGlow);
+    styleL (lufsI, theme::rustBright);
+    lufsM.setText ("M  --", juce::dontSendNotification);
+    lufsS.setText ("S  --", juce::dontSendNotification);
+    lufsI.setText ("I  --", juce::dontSendNotification);
+
+    lufsReset.onClick = [this] { processor.resetIntegratedLoudness(); };
+    canvas.addAndMakeVisible (lufsReset);
+
     refreshSnapshotButtons();
 
     setResizable (true, true);
@@ -248,6 +322,13 @@ void ControlPanelAudioProcessorEditor::timerCallback()
         presetBox.setSelectedId (prog + 1, juce::dontSendNotification);
 
     autoGainLabel.setText ("AUTO " + juce::String (processor.getAutoGainDb(), 1) + " dB", juce::dontSendNotification);
+
+    auto fmt = [] (float v) { return v <= -99.0f ? juce::String::fromUTF8 ("-\xe2\x88\x9e")
+                                                 : juce::String (v, 1); };
+    lufsM.setText ("M  " + fmt (processor.getMomentaryLufs()),  juce::dontSendNotification);
+    lufsS.setText ("S  " + fmt (processor.getShortTermLufs()),  juce::dontSendNotification);
+    lufsI.setText ("I  " + fmt (processor.getIntegratedLufs()), juce::dontSendNotification);
+
     refreshSnapshotButtons();
 }
 
@@ -307,6 +388,17 @@ void ControlPanelAudioProcessorEditor::resized()
     canvas.panels.push_back ({ "GLOBAL", global, theme::brass });
     {
         auto g = global.reduced (10); g.removeFromTop (22);
+
+        // Loudness (LUFS) block pinned to the right of the strip.
+        auto loud = g.removeFromRight (250);
+        lufsCaption.setBounds (loud.removeFromTop (16).reduced (2, 0));
+        auto la = loud.removeFromTop (24);
+        lufsM.setBounds (la.removeFromLeft (la.getWidth() / 2).reduced (2, 0));
+        lufsS.setBounds (la.reduced (2, 0));
+        auto lb = loud.removeFromTop (26);
+        lufsReset.setBounds (lb.removeFromRight (92).reduced (2, 2));
+        lufsI.setBounds (lb.reduced (2, 0));
+
         auto knobs = g.removeFromLeft (6 * 92);
         for (auto* k : { kInput, kOutput, kHead, kMix, kDrift, kBend })
             k->setBounds (knobs.removeFromLeft (92).reduced (4));
@@ -321,7 +413,10 @@ void ControlPanelAudioProcessorEditor::resized()
     }
     all.removeFromTop (8);
 
-    // ---- Split main area: meter on the right ------------------------------
+    // ---- Split main area: art + meter on the right ------------------------
+    auto artCol = all.removeFromRight (224);
+    artPanel.setBounds (artCol);
+    all.removeFromRight (10);
     auto meterCol = all.removeFromRight (92);
     levelMeter->setBounds (meterCol);
     all.removeFromRight (12);
@@ -348,12 +443,15 @@ void ControlPanelAudioProcessorEditor::resized()
             kbQ[b]   ->setBounds (pair.reduced (2));
         }
 
-        // Filters: 2x2 knobs + toggles row.
-        auto togRow = filters.removeFromBottom (20);
-        tHP  ->setBounds (togRow.removeFromLeft (72));
-        tLP  ->setBounds (togRow.removeFromLeft (72));
-        tPropQ->setBounds (togRow.removeFromLeft (86));
-        tEq  ->setBounds (togRow.removeFromRight (60));
+        // Filters: 2x2 knobs + two toggle rows.
+        auto togRow2 = filters.removeFromBottom (20);
+        tLinear->setBounds (togRow2.removeFromLeft (150));
+        tEq    ->setBounds (togRow2.removeFromRight (66));
+        auto togRow1 = filters.removeFromBottom (20);
+        tHP   ->setBounds (togRow1.removeFromLeft (72));
+        tLP   ->setBounds (togRow1.removeFromLeft (72));
+        tPropQ->setBounds (togRow1.removeFromLeft (86));
+        filters.removeFromBottom (4);
         auto r1 = filters.removeFromTop (filters.getHeight() / 2);
         kHP ->setBounds (r1.removeFromLeft (r1.getWidth() / 2).reduced (4));
         kLP ->setBounds (r1.reduced (4));

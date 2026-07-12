@@ -36,6 +36,14 @@ private:
         void paint (juce::Graphics&) override;
     };
 
+    // Right-side art panel: the Mars clown, cover-fit with a brass frame.
+    class ArtPanel : public juce::Component
+    {
+    public:
+        juce::Image image;
+        void paint (juce::Graphics&) override;
+    };
+
     void timerCallback() override;
 
     cfm::gui::RotarySlider*  addKnob   (const char* id, const juce::String& name, juce::Colour accent);
@@ -66,8 +74,13 @@ private:
     cfm::gui::RotarySlider *kTDrive{}, *kTLF{}, *kTHF{};
     cfm::gui::RotarySlider *kWidth{}, *kMono{};
 
-    juce::ToggleButton *tBypass{}, *tDelta{}, *tAuto{}, *tTube{}, *tEq{}, *tHP{}, *tLP{}, *tPropQ{}, *tComp{}, *tAutoMk{}, *tTape{};
+    juce::ToggleButton *tBypass{}, *tDelta{}, *tAuto{}, *tTube{}, *tEq{}, *tHP{}, *tLP{}, *tPropQ{}, *tLinear{}, *tComp{}, *tAutoMk{}, *tTape{};
     juce::ComboBox *cOS{}, *cModel{}, *cMode{}, *cXfmr{}, *cSpeed{};
+
+    // right-side art + loudness (LUFS)
+    ArtPanel artPanel;
+    juce::Label lufsCaption, lufsM, lufsS, lufsI;
+    juce::TextButton lufsReset { "RESET" };
 
     // header widgets
     juce::TextButton presetPrev { "<" }, presetNext { ">" };
@@ -81,7 +94,7 @@ private:
     std::unique_ptr<cfm::gui::LevelMeter>         levelMeter;
     std::unique_ptr<cfm::gui::GainReductionMeter> grMeter;
 
-    static constexpr int baseW = 1120, baseH = 860;
+    static constexpr int baseW = 1360, baseH = 860;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ControlPanelAudioProcessorEditor)
 };

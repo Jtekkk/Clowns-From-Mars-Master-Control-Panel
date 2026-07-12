@@ -32,7 +32,7 @@ void ControlPanelAudioProcessor::cacheParams()
 
     raw.eqOn = g (eqOn); raw.hpOn = g (hpOn); raw.hpFreq = g (hpFreq);
     raw.lpOn = g (lpOn); raw.lpFreq = g (lpFreq); raw.propQ = g (propQ);
-    raw.air = g (air); raw.tight = g (tight);
+    raw.eqLinear = g (eqLinear); raw.air = g (air); raw.tight = g (tight);
     for (int b = 0; b < 5; ++b)
     {
         raw.bFreq[b] = g (bandFreq[b]); raw.bGain[b] = g (bandGain[b]);
@@ -103,10 +103,14 @@ void ControlPanelAudioProcessor::prepareToPlay (double sampleRate, int samplesPe
     currentOsChoice = -1; // force reconfigure on first block
 
     eq.prepare     (baseSampleRate, 2);
+    linEq.prepare  (baseSampleRate, 2);
     comp.prepare   (baseSampleRate, 2);
     stereo.prepare (baseSampleRate, 2);
+    loudness.prepare (baseSampleRate);
     inMeter.prepare  (baseSampleRate);
     outMeter.prepare (baseSampleRate);
+    eqLinearActive = raw.eqLinear->load() > 0.5f;
+    linKernelValid = false;
     tube.setDrift (&driftModel);
     tape.setDrift (&driftModel);
     comp.setDrift (&driftModel);
@@ -148,17 +152,23 @@ void ControlPanelAudioProcessor::selectOversampling (int choice)
     {
         const int factor = 1 << choice; // 2,4,8
         effSr = baseSampleRate * factor;
-        reportedLatency = (int) std::round (oversamplers[choice - 1]->getLatencyInSamples());
+        osLatency = (int) std::round (oversamplers[choice - 1]->getLatencyInSamples());
     }
     else
     {
-        reportedLatency = 0;
+        osLatency = 0;
     }
 
     // (Re)prepare the nonlinear stages at the effective (oversampled) rate.
     tube.prepare (effSr, 2);
     tape.prepare (effSr, 2);
 
+    updateLatency();
+}
+
+void ControlPanelAudioProcessor::updateLatency()
+{
+    reportedLatency = osLatency + (eqLinearActive ? cfm::dsp::LinearPhaseEq::latency : 0);
     dryDelay.setDelay ((double) reportedLatency);
     setLatencySamples (reportedLatency);
 }
@@ -199,6 +209,7 @@ void ControlPanelAudioProcessor::processDouble (double* const* main, int mainCh,
         const double* op[2] = { main[0], mainCh > 1 ? main[1] : main[0] };
         outMeter.process (op, mainCh, numSamples);
         analyzer.push (op, mainCh, numSamples);
+        loudness.process (op, mainCh, numSamples);
         return;
     }
 
@@ -212,11 +223,23 @@ void ControlPanelAudioProcessor::processDouble (double* const* main, int mainCh,
         for (int c = 0; c < mainCh; ++c) main[c][n] *= gn;
     }
 
-    // 2) EQ ------------------------------------------------------------------
-    if (raw.eqOn->load() > 0.5f)
+    // Linear-phase toggle changes latency; handle it before processing.
     {
+        const bool lin = raw.eqLinear->load() > 0.5f;
+        if (lin != eqLinearActive)
+        {
+            eqLinearActive = lin;
+            linEq.reset();
+            linKernelValid = false;
+            updateLatency();
+        }
+    }
+
+    // 2) EQ (minimum-phase biquads, or linear-phase FIR) ---------------------
+    {
+        const bool eqEnabled = raw.eqOn->load() > 0.5f;
         dsp::EqualizerModule::Settings es;
-        es.eqOn = true;
+        es.eqOn = eqEnabled;
         es.hpOn = raw.hpOn->load() > 0.5f; es.hpFreq = raw.hpFreq->load();
         es.lpOn = raw.lpOn->load() > 0.5f; es.lpFreq = raw.lpFreq->load();
         es.propQ = raw.propQ->load() > 0.5f;
@@ -224,13 +247,24 @@ void ControlPanelAudioProcessor::processDouble (double* const* main, int mainCh,
         for (int b = 0; b < 5; ++b)
             es.band[b] = { raw.bOn[b]->load() > 0.5f, raw.bFreq[b]->load(), raw.bGain[b]->load(), raw.bQ[b]->load() };
         eq.setSettings (es);
-        eq.updateCoefficients();
-        eq.process (main, mainCh, numSamples);
-    }
-    else
-    {
-        dsp::EqualizerModule::Settings es; es.eqOn = false;
-        eq.setSettings (es); eq.updateCoefficients();
+        const bool coeffsChanged = eq.updateCoefficients();
+
+        if (eqEnabled)
+        {
+            if (eqLinearActive)
+            {
+                if (coeffsChanged || ! linKernelValid)
+                {
+                    linEq.rebuild ([this] (double f) { return eq.magnitudeAt (f); });
+                    linKernelValid = true;
+                }
+                linEq.process (main, mainCh, numSamples);
+            }
+            else
+            {
+                eq.process (main, mainCh, numSamples);
+            }
+        }
     }
 
     // 3) Compressor ----------------------------------------------------------
@@ -375,10 +409,11 @@ void ControlPanelAudioProcessor::processDouble (double* const* main, int mainCh,
         }
     }
 
-    // ---- output meter + analyzer ------------------------------------------
+    // ---- output meter + analyzer + loudness -------------------------------
     const double* op[2] = { main[0], mainCh > 1 ? main[1] : main[0] };
     outMeter.process (op, mainCh, numSamples);
     analyzer.push (op, mainCh, numSamples);
+    loudness.process (op, mainCh, numSamples);
 }
 
 //==============================================================================
@@ -481,6 +516,16 @@ void ControlPanelAudioProcessor::applyProgram (int index)
 {
     auto& f = cfm::presets::factory();
     if (! juce::isPositiveAndBelow (index, (int) f.size())) return;
+
+    // Presets are self-contained: reset every parameter to its default first,
+    // so a preset sounds identical no matter what was loaded before it. Only
+    // then apply the values this preset explicitly names. Without this reset,
+    // controls omitted by a preset would inherit whatever the previous preset
+    // left behind, making recalls order-dependent and non-reproducible.
+    for (auto* p : getParameters())
+        if (auto* rp = dynamic_cast<juce::RangedAudioParameter*> (p))
+            rp->setValueNotifyingHost (rp->getDefaultValue());
+
     for (auto& kv : f[(size_t) index].values)
         if (auto* p = dynamic_cast<juce::RangedAudioParameter*> (apvts.getParameter (kv.first)))
             p->setValueNotifyingHost (p->convertTo0to1 (kv.second));

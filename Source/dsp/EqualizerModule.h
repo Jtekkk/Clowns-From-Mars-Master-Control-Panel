@@ -52,11 +52,28 @@ namespace cfm::dsp
             std::array<Band, numBands> band {};
         };
 
-        void setSettings (const Settings& s) noexcept { pending = s; dirty = true; }
-
-        void updateCoefficients() noexcept
+        void setSettings (const Settings& s) noexcept
         {
-            if (! dirty) return;
+            if (! settingsEqual (s, pending)) { pending = s; dirty = true; }
+        }
+
+        static bool settingsEqual (const Settings& a, const Settings& b) noexcept
+        {
+            if (a.eqOn != b.eqOn || a.hpOn != b.hpOn || a.hpFreq != b.hpFreq
+                || a.lpOn != b.lpOn || a.lpFreq != b.lpFreq || a.propQ != b.propQ
+                || a.air != b.air || a.tight != b.tight) return false;
+            for (int i = 0; i < numBands; ++i)
+            {
+                const auto& x = a.band[i]; const auto& y = b.band[i];
+                if (x.on != y.on || x.freq != y.freq || x.gain != y.gain || x.q != y.q) return false;
+            }
+            return true;
+        }
+
+        // Returns true if the coefficients were actually (re)computed this call.
+        bool updateCoefficients() noexcept
+        {
+            if (! dirty) return false;
             dirty = false;
             active = pending;
 
@@ -90,6 +107,7 @@ namespace cfm::dsp
             // TIGHT — 250 Hz low shelf cut, up to -6 dB, cleans low mud.
             assignAll (tightF, Coefs::makeLowShelf (sampleRate, 250.0, 0.7,
                                                     dbToGain (-active.tight * 0.06 * 6.0)));
+            return true;
         }
 
         void process (double* const* data, int numChannels, int numSamples) noexcept

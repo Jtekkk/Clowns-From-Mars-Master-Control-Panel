@@ -12,6 +12,8 @@
 #include "dsp/TapeModule.h"
 #include "dsp/StereoModule.h"
 #include "dsp/Metering.h"
+#include "dsp/LoudnessMeter.h"
+#include "dsp/LinearPhaseEq.h"
 
 /**
     MASTER CONTROL PANEL — intelligent analog-modelled mastering processor.
@@ -80,6 +82,11 @@ public:
     float getAutoGainDb()      const noexcept { return autoGainDbAtomic.load (std::memory_order_relaxed); }
     juce::int64 getSerial()    const noexcept { return serial; }
 
+    float getMomentaryLufs()  const noexcept { return loudness.getMomentaryLufs(); }
+    float getShortTermLufs()  const noexcept { return loudness.getShortTermLufs(); }
+    float getIntegratedLufs() const noexcept { return loudness.getIntegratedLufs(); }
+    void  resetIntegratedLoudness() noexcept  { loudness.resetIntegrated(); }
+
     // Queries the EQ magnitude response (dB) for the UI curve.
     double getEqMagnitudeDb (double freqHz) noexcept
     {
@@ -105,6 +112,7 @@ private:
     void ensureSerial();
     void prepareBuffers (int block);
     void selectOversampling (int choice);
+    void updateLatency();
 
     // The single double-precision core. Operates in place on `main` (up to 2
     // channels); `sc` is an optional external sidechain (may be nullptr).
@@ -122,7 +130,7 @@ private:
         std::atomic<float>* tubeModel; std::atomic<float>* tubeTone;
         std::atomic<float>* eqOn; std::atomic<float>* hpOn; std::atomic<float>* hpFreq;
         std::atomic<float>* lpOn; std::atomic<float>* lpFreq; std::atomic<float>* propQ;
-        std::atomic<float>* air; std::atomic<float>* tight;
+        std::atomic<float>* eqLinear; std::atomic<float>* air; std::atomic<float>* tight;
         std::atomic<float>* bFreq[5]; std::atomic<float>* bGain[5]; std::atomic<float>* bQ[5]; std::atomic<float>* bOn[5];
         std::atomic<float>* compOn; std::atomic<float>* compThresh; std::atomic<float>* compRatio;
         std::atomic<float>* compAttack; std::atomic<float>* compRelease; std::atomic<float>* compKnee;
@@ -143,6 +151,8 @@ private:
     cfm::dsp::TubeStage        tube;
     cfm::dsp::TapeModule       tape;
     cfm::dsp::StereoModule     stereo;
+    cfm::dsp::LinearPhaseEq    linEq;
+    cfm::dsp::LoudnessMeter    loudness;
     cfm::dsp::MeterBallistics  inMeter, outMeter;
     cfm::dsp::AnalyzerFifo     analyzer;
 
@@ -159,6 +169,9 @@ private:
     juce::AudioBuffer<double> workBuffer;     // widened main (float path)
     juce::AudioBuffer<double> scWorkBuffer;   // widened sidechain (float path)
     int reportedLatency = 0;
+    int osLatency = 0;
+    bool eqLinearActive = false;
+    bool linKernelValid = false;
 
     // Smoothed gain staging (per-sample, anti-zipper).
     juce::LinearSmoothedValue<double> inGainSm, outGainSm, mixSm;

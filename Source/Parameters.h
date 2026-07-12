@@ -44,6 +44,7 @@ namespace cfm::params
         inline constexpr auto lpOn        = "lpOn";
         inline constexpr auto lpFreq      = "lpFreq";
         inline constexpr auto propQ       = "propQ";        // proportional-Q mode
+        inline constexpr auto eqLinear    = "eqLinear";     // linear-phase EQ mode
         inline constexpr auto air         = "air";          // AIR shelf
         inline constexpr auto tight       = "tight";        // TIGHT low clean-up
 
