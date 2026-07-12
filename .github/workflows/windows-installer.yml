@@ -76,10 +76,14 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           $exe = (Get-ChildItem installer\Output\*.exe | Select-Object -First 1).FullName
-          gh release delete windows-latest --yes --cleanup-tag 2>$null
+          # Never delete the release (a killed run must not leave a 404). Create it
+          # only if missing, then clobber-upload the installer so the link is stable.
+          gh release view windows-latest 2>$null
+          if ($LASTEXITCODE -ne 0) {
+            gh release create windows-latest `
+              --title "Windows Installer (latest build)" `
+              --notes "Auto-built VST3 installer (Windows x64) for Clowns From Mars Master Control Panel. Close your DAW, run the .exe, then rescan plugins." `
+              --prerelease --target $env:GITHUB_SHA
+          }
           $global:LASTEXITCODE = 0
-          gh release create windows-latest "$exe" `
-            --title "Windows Installer (latest build)" `
-            --notes "Auto-built VST3 installer (Windows x64) for Clowns From Mars Master Control Panel. Close your DAW, run the .exe, then rescan plugins." `
-            --prerelease `
-            --target $env:GITHUB_SHA
+          gh release upload windows-latest "$exe" --clobber
