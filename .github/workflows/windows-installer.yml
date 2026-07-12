@@ -20,7 +20,9 @@ permissions:
 jobs:
   build-windows:
     runs-on: windows-latest
-    timeout-minutes: 30
+    # JUCE compiles from scratch each run (no cache); slower Windows runners
+    # need ~30 min just for the VST3, so give generous headroom over that.
+    timeout-minutes: 55
     env:
       CMAKE_BUILD_PARALLEL_LEVEL: "4"
 
