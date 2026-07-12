@@ -20,6 +20,8 @@ permissions:
 jobs:
   build-windows:
     runs-on: windows-latest
+    env:
+      CMAKE_BUILD_PARALLEL_LEVEL: "4"
 
     steps:
       - name: Checkout
@@ -37,7 +39,7 @@ jobs:
         run: cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DTT_COPY_PLUGIN=OFF
 
       - name: Build VST3 (Release)
-        run: cmake --build build --target MasterControlPanel_VST3 --parallel
+        run: cmake --build build --target MasterControlPanel_VST3 --parallel 4
 
       - name: Locate VST3 bundle
         id: vst3

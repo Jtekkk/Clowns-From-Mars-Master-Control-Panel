@@ -110,8 +110,10 @@ target_link_libraries(MasterControlPanel PRIVATE
     juce::juce_gui_extra
     PUBLIC
     juce::juce_recommended_config_flags
-    juce::juce_recommended_lto_flags
     juce::juce_recommended_warning_flags)
+# NOTE: juce_recommended_lto_flags is intentionally omitted. On MSVC it enables
+# /GL /LTCG which makes an all-of-JUCE build extremely slow with negligible
+# real-world DSP benefit. Opt in explicitly with -DTT_ENABLE_LTO=ON if desired.
 
 # ----------------------------------------------------------------------------
 #  Internal verification / UI-snapshot tool (developer use only, not shipped)
