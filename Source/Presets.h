@@ -42,9 +42,9 @@ namespace cfm::presets
             { "03 - Loud & Proud", {
                 { compOn, 1 }, { compThresh, -18 }, { compRatio, 4 }, { compAttack, 10 },
                 { compRelease, 150 }, { compMode, 0 }, { compOptBlend, 30 },
-                { tubeOn, 1 }, { tubeModel, 1 }, { tubeDrive, 55 },
-                { tapeOn, 1 }, { tapeSpeed, 0 }, { tapeDrive, 45 },
-                { headroom, -3 }, { air, 20 }, { tight, 20 } } },
+                { tubeOn, 1 }, { tubeModel, 1 }, { tubeDrive, 46 },
+                { tapeOn, 1 }, { tapeSpeed, 0 }, { tapeDrive, 36 },
+                { headroom, -3 }, { air, 22 }, { tight, 22 } } },
 
             { "04 - Airy Master", {
                 { eqOn, 1 }, { eqLinear, 1 }, { air, 45 }, { bandGain[4], 3 }, { bandFreq[4], 12000 }, { bandOn[4], 1 },
@@ -67,10 +67,10 @@ namespace cfm::presets
                 { tubeOn, 1 }, { tubeModel, 0 }, { tubeDrive, 22 }, { compOn, 0 } } },
 
             { "08 - Mars Crush", {
-                { tubeOn, 1 }, { tubeModel, 2 }, { tubeDrive, 70 }, { tubeBias, 30 },
-                { circuitBend, 30 }, { tapeOn, 1 }, { tapeSpeed, 0 }, { tapeDrive, 50 },
-                { compOn, 1 }, { compThresh, -20 }, { compRatio, 6 }, { transformer, 2 },
-                { width, 110 }, { drift, 60 } } },
+                { tubeOn, 1 }, { tubeModel, 2 }, { tubeDrive, 56 }, { tubeBias, 22 },
+                { circuitBend, 24 }, { tapeOn, 1 }, { tapeSpeed, 0 }, { tapeDrive, 42 },
+                { compOn, 1 }, { compThresh, -20 }, { compRatio, 5 }, { transformer, 2 },
+                { width, 110 }, { drift, 55 } } },
 
             { "09 - Main Stage Voltage", {
                 { eqOn, 1 }, { hpOn, 1 }, { hpFreq, 30 }, { tight, 32 },
@@ -121,14 +121,14 @@ namespace cfm::presets
                 { tubeBias, 12 }, { tubeTone, 8 }, { monoFreq, 110 }, { width, 105 } } },
 
             { "14 - Concrete Trunk Rattle", {
-                { inputTrim, 0 }, { headroom, 8 }, { oversample, 2 }, { autoGain, 1 },
+                { inputTrim, 0 }, { headroom, 4 }, { oversample, 2 }, { autoGain, 1 },
                 { mix, 100 }, { eqOn, 1 }, { hpOn, 1 }, { hpFreq, 28 },
-                { tight, 40 }, { bandOn[0], 1 }, { bandFreq[0], 60 }, { bandGain[0], 4 },
-                { bandQ[0], 0.8f }, { bandOn[3], 1 }, { bandFreq[3], 4000 }, { bandGain[3], 3 },
+                { tight, 40 }, { bandOn[0], 1 }, { bandFreq[0], 60 }, { bandGain[0], 3 },
+                { bandQ[0], 0.8f }, { bandOn[3], 1 }, { bandFreq[3], 4000 }, { bandGain[3], 2.5f },
                 { bandQ[3], 1.2f }, { compOn, 1 }, { compThresh, -22 }, { compRatio, 4 },
                 { compAttack, 12 }, { compRelease, 120 }, { compKnee, 3 }, { compAutoMk, 1 },
                 { compMode, 0 }, { compOptBlend, 25 }, { scHpf, 110 }, { transformer, 2 },
-                { tubeOn, 1 }, { tubeModel, 2 }, { tubeDrive, 55 }, { tubeBias, -25 },
+                { tubeOn, 1 }, { tubeModel, 2 }, { tubeDrive, 46 }, { tubeBias, -25 },
                 { tubeTone, 18 }, { circuitBend, 15 }, { monoFreq, 120 }, { width, 115 } } },
 
             { "15 - Dusty Boom Bap", {
@@ -185,8 +185,8 @@ namespace cfm::presets
                 { bandGain[2], 3.5f }, { bandQ[2], 1.1f }, { compOn, 1 }, { compThresh, -16 },
                 { compRatio, 3 }, { compAttack, 20 }, { compRelease, 180 }, { compKnee, 6 },
                 { compAutoMk, 1 }, { compMode, 0 }, { compOptBlend, 45 }, { scHpf, 85 },
-                { transformer, 2 }, { tubeOn, 1 }, { tubeModel, 2 }, { tubeDrive, 52 },
-                { tubeBias, 35 }, { tubeTone, -14 }, { tapeOn, 1 }, { tapeDrive, 45 },
+                { transformer, 2 }, { tubeOn, 1 }, { tubeModel, 2 }, { tubeDrive, 44 },
+                { tubeBias, 35 }, { tubeTone, -14 }, { tapeOn, 1 }, { tapeDrive, 36 },
                 { tapeSpeed, 0 }, { tapeLF, 2 }, { tapeHF, -2 }, { autoGain, 1 } } },
 
             { "20 - Snap And Spit", {
@@ -276,8 +276,8 @@ namespace cfm::presets
                 { mix, 100 } } },
 
             { "30 - Starved Filament Grit", {
-                { tubeOn, 1 }, { tubeModel, 2 }, { tubeDrive, 62 }, { tubeBias, -34 },
-                { tubeTone, -14 }, { headroom, 8 }, { circuitBend, 22 }, { eqOn, 1 },
+                { tubeOn, 1 }, { tubeModel, 2 }, { tubeDrive, 50 }, { tubeBias, -34 },
+                { tubeTone, -14 }, { headroom, 5 }, { circuitBend, 22 }, { eqOn, 1 },
                 { hpOn, 1 }, { hpFreq, 32 }, { tight, 26 }, { compOn, 1 },
                 { compThresh, -18 }, { compRatio, 3 }, { compAttack, 22 }, { compRelease, 180 },
                 { compOptBlend, 20 }, { compAutoMk, 1 }, { scHpf, 90 }, { transformer, 2 },

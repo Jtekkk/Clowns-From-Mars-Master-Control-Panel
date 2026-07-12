@@ -238,6 +238,79 @@ int main (int argc, char** argv)
         if (! lfin || proc->getLatencySamples() <= 0) ok = false;
     }
 
+    // (6) EQ frequency-response probe: real, end-to-end measurement that the
+    //     AIR shelf is ~+6 dB at full (not +36 dB) and that Proportional-Q no
+    //     longer turns a shelf boost into a resonant overshoot.
+    {
+        auto findParam = [&] (const juce::String& nm) -> juce::AudioProcessorParameter*
+        { for (auto* p : params) if (p->getName (64).equalsIgnoreCase (nm)) return p; return nullptr; };
+        auto setP = [&] (const juce::String& nm, double real)
+        {
+            if (auto* p = findParam (nm))
+                if (auto* rp = dynamic_cast<juce::RangedAudioParameter*> (p))
+                    rp->setValueNotifyingHost (rp->convertTo0to1 ((float) real));
+        };
+        const double sr = 48000.0; const int block = 256;
+        proc->setProcessingPrecision (juce::AudioProcessor::singlePrecision);
+
+        auto measureGainDb = [&] (double freq) -> double
+        {
+            proc->setPlayConfigDetails (2, 2, sr, block);
+            proc->prepareToPlay (sr, block);
+            juce::AudioBuffer<float> buf (2, block);
+            juce::MidiBuffer midi;
+            const double amp = 0.2;
+            double outSq = 0.0; int count = 0;
+            for (int iter = 0; iter < 80; ++iter)
+            {
+                for (int ch = 0; ch < 2; ++ch)
+                {
+                    auto* d = buf.getWritePointer (ch);
+                    for (int n = 0; n < block; ++n)
+                    {
+                        const double t = (iter * block + n) / sr;
+                        d[n] = (float) (amp * std::sin (juce::MathConstants<double>::twoPi * freq * t));
+                    }
+                }
+                proc->processBlock (buf, midi);
+                if (iter >= 48)
+                    for (int ch = 0; ch < 2; ++ch) { auto* d = buf.getReadPointer (ch);
+                        for (int n = 0; n < block; ++n) { outSq += d[n]*d[n]; ++count; } }
+            }
+            const double outRms = std::sqrt (outSq / juce::jmax (1, count));
+            const double inRms  = amp / std::sqrt (2.0);
+            return 20.0 * std::log10 (juce::jmax (1.0e-9, outRms / inRms));
+        };
+
+        // Neutralise everything except the EQ so we measure it in isolation.
+        for (auto* p : params) p->setValueNotifyingHost (p->getDefaultValue());
+        setP ("Auto Gain", 0); setP ("Tube On", 0); setP ("Comp On", 0); setP ("Tape On", 0);
+        setP ("EQ On", 1); setP ("Linear Phase", 0); setP ("Oversampling", 0);
+        setP ("HP On", 0); setP ("LP On", 0); setP ("Mix", 100);
+        setP ("Low Shelf Gain", 0); setP ("Low Mid Gain", 0); setP ("Mid Gain", 0);
+        setP ("High Mid Gain", 0); setP ("High Shelf Gain", 0);
+        setP ("AIR", 0); setP ("TIGHT", 0);
+
+        setP ("AIR", 100);
+        const double airHi = measureGainDb (16000.0);
+        const double airLo = measureGainDb (1000.0);
+        setP ("AIR", 0);
+        std::printf ("  EQ probe: AIR=100%% @16k = %+.1f dB (expect ~+5), @1k = %+.1f dB (expect ~0)\n", airHi, airLo);
+        if (airHi > 9.0 || airHi < 2.0 || std::abs (airLo) > 1.0) { std::printf ("  !! AIR shelf scaling wrong\n"); ok = false; }
+
+        setP ("Proportional Q", 1);
+        setP ("Low Shelf On", 1); setP ("Low Shelf Freq", 100); setP ("Low Shelf Q", 0.7);
+        setP ("Low Shelf Gain", 12);
+        double peak = -99.0;
+        const double probeF[] = { 30, 50, 80, 120, 180, 260, 400 };
+        for (double f : probeF) peak = juce::jmax (peak, measureGainDb (f));
+        const double plateau = measureGainDb (30.0);
+        setP ("Low Shelf Gain", 0);
+        std::printf ("  EQ probe: low-shelf +12 dB (propQ on) plateau %+.1f dB, sweep peak %+.1f dB (overshoot %.1f dB)\n",
+                     plateau, peak, peak - 12.0);
+        if (peak - 12.0 > 1.5) { std::printf ("  !! shelf resonance: Proportional-Q inflating shelf Q\n"); ok = false; }
+    }
+
     std::printf ("DSP verification: %s  (fuzz finite ok, fuzzMaxAbs=%.2f, worstLatency=%d)\n",
                  ok ? "PASS" : "FAIL", fuzzMaxAbs, worstLatency);
 

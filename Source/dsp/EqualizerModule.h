@@ -92,7 +92,12 @@ namespace cfm::dsp
                 const auto& bs = active.band[b];
                 const double f = clampF (bs.freq);
                 const double g = dbToGain (bs.gain);
-                const double q = effectiveQ (bs.q, bs.gain);
+                const bool  isShelf = (b == 0 || b == numBands - 1);
+                // Proportional-Q is a bell concept: on a shelf, any Q above
+                // Butterworth (~0.707) produces a resonant overshoot at the
+                // corner. Keep shelves at their (Butterworth-ish) base Q and
+                // apply the proportional law only to the three peak bands.
+                const double q = isShelf ? bs.q : effectiveQ (bs.q, bs.gain);
 
                 Coefs::Ptr c;
                 if (b == 0)                 c = Coefs::makeLowShelf  (sampleRate, f, q, g);
@@ -101,12 +106,12 @@ namespace cfm::dsp
                 assignAll (bands[b], c);
             }
 
-            // AIR — fixed 15 kHz high shelf, up to +6 dB.
+            // AIR — fixed 15 kHz high shelf, 0..100% maps to 0..+6 dB.
             assignAll (airF, Coefs::makeHighShelf (sampleRate, clampF (15000.0), 0.6,
-                                                   dbToGain (active.air * 0.06 * 6.0)));
-            // TIGHT — 250 Hz low shelf cut, up to -6 dB, cleans low mud.
+                                                   dbToGain (active.air * 0.06)));
+            // TIGHT — 250 Hz low shelf cut, 0..100% maps to 0..-6 dB, cleans low mud.
             assignAll (tightF, Coefs::makeLowShelf (sampleRate, 250.0, 0.7,
-                                                    dbToGain (-active.tight * 0.06 * 6.0)));
+                                                    dbToGain (-active.tight * 0.06)));
             return true;
         }
 
