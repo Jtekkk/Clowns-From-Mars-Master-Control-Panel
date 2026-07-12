@@ -164,6 +164,38 @@ int main (int argc, char** argv)
         std::printf ("  preset sweep: %d programs, %d flagged\n", nProg, bad);
     }
 
+    // (4) Native double-precision path: the host may hand us 64-bit buffers.
+    {
+        proc->setProcessingPrecision (juce::AudioProcessor::doublePrecision);
+        const double sr = 48000.0; const int block = 256;
+        proc->setPlayConfigDetails (2, 2, sr, block);
+        proc->prepareToPlay (sr, block);
+        for (auto* p : params) p->setValueNotifyingHost (p->getDefaultValue());
+
+        juce::AudioBuffer<double> buf (2, block);
+        juce::MidiBuffer midi;
+        bool dfin = true; double dmax = 0.0;
+        for (int iter = 0; iter < 120; ++iter)
+        {
+            for (int ch = 0; ch < 2; ++ch)
+            {
+                auto* d = buf.getWritePointer (ch);
+                for (int n = 0; n < block; ++n)
+                {
+                    const double t = (iter * block + n) / sr;
+                    d[n] = 0.3 * std::sin (juce::MathConstants<double>::twoPi * 220.0 * t);
+                }
+            }
+            proc->processBlock (buf, midi);
+            for (int ch = 0; ch < 2; ++ch) { auto* d = buf.getReadPointer (ch);
+                for (int n = 0; n < block; ++n) { if (! std::isfinite (d[n])) dfin = false;
+                    dmax = juce::jmax (dmax, std::abs (d[n])); } }
+        }
+        std::printf ("  double-precision path: finite=%s peak=%.3f\n", dfin ? "yes" : "NO", dmax);
+        if (! dfin) ok = false;
+        proc->setProcessingPrecision (juce::AudioProcessor::singlePrecision);
+    }
+
     std::printf ("DSP verification: %s  (fuzz finite ok, fuzzMaxAbs=%.2f, worstLatency=%d)\n",
                  ok ? "PASS" : "FAIL", fuzzMaxAbs, worstLatency);
 

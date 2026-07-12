@@ -28,7 +28,7 @@ namespace cfm::params
         add (new APB (pid (id::bypass),     "Bypass",   false));
         add (new APB (pid (id::delta),      "Delta",    false));
         add (new APB (pid (id::autoGain),   "Auto Gain", true));
-        add (new APC (pid (id::oversample), "Oversampling", oversampleChoices(), (int) Oversample::x2));
+        add (new APC (pid (id::oversample), "Oversampling", oversampleChoices(), (int) Oversample::x4));
         add (new APF (pid (id::drift),      "Drift",       juce::NormalisableRange<float> (0.f, 100.f, 0.1f), 25.f, pct()));
         add (new APF (pid (id::circuitBend),"Circuit Bend",juce::NormalisableRange<float> (0.f, 100.f, 0.1f), 0.f, pct()));
 

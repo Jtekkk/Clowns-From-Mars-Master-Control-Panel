@@ -11,6 +11,18 @@ It is a real, buildable [JUCE](https://juce.com) plugin (VST3 / Standalone, and
 AU on macOS), written for top-tier DSP quality and boring, reliable behaviour
 across DAWs, sample rates and buffer sizes.
 
+### Fidelity
+
+- **64-bit double precision end to end.** Every filter, envelope, saturator and
+  gain stage runs at 64-bit; when the host offers double-precision buffers we
+  process them natively, otherwise we widen 32→64-bit, process, and narrow back
+  — so the DSP is always at reference precision regardless of host settings.
+- **Exact transcendentals.** Saturation uses the true `tanh` (not a rational
+  approximation) so the harmonic series is correct; nonlinear stages run inside
+  double-precision oversampling (default 4×, up to 8×) for clean anti-aliasing.
+- **IEEE-correct math** (no `-ffast-math`), denormals flushed, per-sample
+  smoothed gain staging (no zipper), and **true-peak (4× inter-sample) metering**.
+
 ---
 
 ## Signal flow

@@ -53,7 +53,6 @@ void ControlPanelAudioProcessor::cacheParams()
 
 void ControlPanelAudioProcessor::ensureSerial()
 {
-    // Persisted in state; if absent, mint a deterministic-but-unique fingerprint.
     if (serial == 0)
     {
         auto& tree = apvts.state;
@@ -79,7 +78,6 @@ bool ControlPanelAudioProcessor::isBusesLayoutSupported (const BusesLayout& layo
     if (mainIn != mainOut)
         return false;
 
-    // Sidechain may be disabled, mono, or stereo.
     if (layouts.inputBuses.size() > 1)
     {
         const auto sc = layouts.getChannelSet (true, 1);
@@ -95,7 +93,7 @@ void ControlPanelAudioProcessor::prepareToPlay (double sampleRate, int samplesPe
     baseSampleRate = sampleRate;
     maxBlockSize   = samplesPerBlock;
 
-    using OS = juce::dsp::Oversampling<float>;
+    using OS = juce::dsp::Oversampling<double>;
     for (int i = 0; i < 3; ++i)
     {
         oversamplers[i] = std::make_unique<OS> (2, (size_t) (i + 1),
@@ -117,32 +115,39 @@ void ControlPanelAudioProcessor::prepareToPlay (double sampleRate, int samplesPe
     dryDelay.prepare (spec);
     dryDelay.reset();
 
-    dryBuffer.setSize (2, samplesPerBlock);
-    alignedDrySetup (samplesPerBlock);
+    prepareBuffers (samplesPerBlock);
 
-    agCoeff = std::exp (-1.0f / (float) (0.3 * baseSampleRate));
-    agInSq = agOutSq = 1.0e-6f; agGainSmoothed = 1.0f;
-    cbHold = { 0.f, 0.f }; cbCounter = { 0, 0 };
+    const double smoothT = 0.02; // 20 ms anti-zipper smoothing
+    inGainSm.reset  (baseSampleRate, smoothT);
+    outGainSm.reset (baseSampleRate, smoothT);
+    mixSm.reset     (baseSampleRate, smoothT);
+    inGainSm.setCurrentAndTargetValue  (dsp::dbToGain ((double) raw.inputTrim->load()));
+    outGainSm.setCurrentAndTargetValue (dsp::dbToGain ((double) raw.outputTrim->load()));
+    mixSm.setCurrentAndTargetValue     ((double) raw.mix->load() * 0.01);
+
+    agCoeff = std::exp (-1.0 / (0.3 * baseSampleRate));
+    agInSq = agOutSq = 1.0e-6; agGainSmoothed = 1.0;
+    cbHold = { 0.0, 0.0 }; cbCounter = { 0, 0 };
 }
 
-//==============================================================================
-void ControlPanelAudioProcessor::alignedDrySetup (int block)
+void ControlPanelAudioProcessor::prepareBuffers (int block)
 {
-    alignedDry.setSize (2, block);
+    dryBuffer.setSize    (2, block);
+    alignedDry.setSize   (2, block);
+    workBuffer.setSize   (2, block);
+    scWorkBuffer.setSize (2, block);
 }
 
-void ControlPanelAudioProcessor::selectOversampling (int choice, int mainCh)
+void ControlPanelAudioProcessor::selectOversampling (int choice)
 {
     if (choice == currentOsChoice) return;
     currentOsChoice = choice;
 
     double effSr = baseSampleRate;
-    int    effBlk = maxBlockSize;
     if (choice > 0)
     {
         const int factor = 1 << choice; // 2,4,8
-        effSr  = baseSampleRate * factor;
-        effBlk = maxBlockSize * factor;
+        effSr = baseSampleRate * factor;
         reportedLatency = (int) std::round (oversamplers[choice - 1]->getLatencyInSamples());
     }
     else
@@ -150,55 +155,35 @@ void ControlPanelAudioProcessor::selectOversampling (int choice, int mainCh)
         reportedLatency = 0;
     }
 
-    // (Re)prepare the nonlinear stages at the effective (oversampled) rate so
-    // their internal filters land on the right cutoffs.
+    // (Re)prepare the nonlinear stages at the effective (oversampled) rate.
     tube.prepare (effSr, 2);
     tape.prepare (effSr, 2);
-    juce::ignoreUnused (effBlk, mainCh);
 
-    dryDelay.setDelay ((float) reportedLatency);
+    dryDelay.setDelay ((double) reportedLatency);
     setLatencySamples (reportedLatency);
 }
 
 //==============================================================================
-void ControlPanelAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer&)
+// The single 64-bit processing core. Operates in place on `main`.
+void ControlPanelAudioProcessor::processDouble (double* const* main, int mainCh, int numSamples,
+                                                const double* const* sc, int scCh)
 {
-    juce::ScopedNoDenormals noDenormals;
-
-    auto mainIO = getBusBuffer (buffer, true, 0);
-    const int mainCh    = juce::jmin (2, mainIO.getNumChannels());
-    const int numSamples = buffer.getNumSamples();
-    if (mainCh == 0 || numSamples == 0) return;
-
-    // ---- oversampling selection / latency ----------------------------------
     const int osChoice = (int) raw.oversample->load();
-    selectOversampling (osChoice, mainCh);
-
-    // ---- gather sidechain (optional) ---------------------------------------
-    const float* scPtrs[2] = { nullptr, nullptr };
-    int scCh = 0;
-    if (auto* scBusPtr = getBus (true, 1); scBusPtr != nullptr && scBusPtr->isEnabled())
-    {
-        auto scBuf = getBusBuffer (buffer, true, 1);
-        scCh = juce::jmin (2, scBuf.getNumChannels());
-        for (int c = 0; c < scCh; ++c) scPtrs[c] = scBuf.getReadPointer (c);
-    }
-
-    float* main[2] = { nullptr, nullptr };
-    for (int c = 0; c < mainCh; ++c) main[c] = mainIO.getWritePointer (c);
+    selectOversampling (osChoice);
 
     // ---- capture true-input dry & feed input meter -------------------------
-    for (int c = 0; c < mainCh; ++c) dryBuffer.copyFrom (c, 0, main[c], numSamples);
+    for (int c = 0; c < mainCh; ++c)
+        juce::FloatVectorOperations::copy (dryBuffer.getWritePointer (c), main[c], numSamples);
     {
-        const float* dp[2] = { dryBuffer.getReadPointer (0), mainCh > 1 ? dryBuffer.getReadPointer (1) : dryBuffer.getReadPointer (0) };
+        const double* dp[2] = { dryBuffer.getReadPointer (0), mainCh > 1 ? dryBuffer.getReadPointer (1) : dryBuffer.getReadPointer (0) };
         inMeter.process (dp, mainCh, numSamples);
     }
 
-    // ---- latency-align the dry path (for mix / delta / bypass) -------------
+    // ---- latency-align the dry path ----------------------------------------
     for (int c = 0; c < mainCh; ++c)
     {
-        const float* d = dryBuffer.getReadPointer (c);
-        float* ad = alignedDry.getWritePointer (c);
+        const double* d = dryBuffer.getReadPointer (c);
+        double* ad = alignedDry.getWritePointer (c);
         for (int n = 0; n < numSamples; ++n)
         {
             dryDelay.pushSample (c, d[n]);
@@ -211,19 +196,21 @@ void ControlPanelAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     {
         for (int c = 0; c < mainCh; ++c)
             juce::FloatVectorOperations::copy (main[c], alignedDry.getReadPointer (c), numSamples);
-        const float* op[2] = { main[0], mainCh > 1 ? main[1] : main[0] };
+        const double* op[2] = { main[0], mainCh > 1 ? main[1] : main[0] };
         outMeter.process (op, mainCh, numSamples);
         analyzer.push (op, mainCh, numSamples);
         return;
     }
 
-    // ------------------------------------------------------------------ CHAIN
-    driftModel.setAmount (raw.drift->load());
+    driftModel.setAmount ((double) raw.drift->load());
 
-    // 1) Input trim ----------------------------------------------------------
-    const float inGain = dsp::dbToGain (raw.inputTrim->load());
-    for (int c = 0; c < mainCh; ++c)
-        juce::FloatVectorOperations::multiply (main[c], inGain, numSamples);
+    // 1) Input trim (per-sample smoothed) ------------------------------------
+    inGainSm.setTargetValue (dsp::dbToGain ((double) raw.inputTrim->load()));
+    for (int n = 0; n < numSamples; ++n)
+    {
+        const double gn = inGainSm.getNextValue();
+        for (int c = 0; c < mainCh; ++c) main[c][n] *= gn;
+    }
 
     // 2) EQ ------------------------------------------------------------------
     if (raw.eqOn->load() > 0.5f)
@@ -242,7 +229,6 @@ void ControlPanelAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     }
     else
     {
-        // keep the response query in sync even when bypassed
         dsp::EqualizerModule::Settings es; es.eqOn = false;
         eq.setSettings (es); eq.updateCoefficients();
     }
@@ -256,20 +242,20 @@ void ControlPanelAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer,
         cs.knee = raw.compKnee->load();
         cs.makeup = raw.compMakeup->load(); cs.autoMakeup = raw.compAutoMk->load() > 0.5f;
         cs.mode = (int) raw.compMode->load();
-        cs.optBlend = raw.compOptBlend->load() * 0.01f;
-        cs.mix = raw.compMix->load() * 0.01f;
+        cs.optBlend = raw.compOptBlend->load() * 0.01;
+        cs.mix = raw.compMix->load() * 0.01;
         cs.scHpFreq = raw.scHpf->load();
         cs.transformer = (int) raw.transformer->load();
         comp.setSettings (cs);
-        comp.process (main, mainCh, numSamples, scCh > 0 ? scPtrs : nullptr, scCh);
-        grDbAtomic.store (comp.getGainReductionDb(), std::memory_order_relaxed);
+        comp.process (main, mainCh, numSamples, scCh > 0 ? sc : nullptr, scCh);
+        grDbAtomic.store ((float) comp.getGainReductionDb(), std::memory_order_relaxed);
     }
 
     // 4) Headroom -> Oversampled nonlinear ( Tube -> Tape ) -> -Headroom -----
     {
-        const float hr = raw.headroom->load();
-        const float preG  = dsp::dbToGain (hr);
-        const float postG = dsp::dbToGain (-hr);
+        const double hr = raw.headroom->load();
+        const double preG  = dsp::dbToGain (hr);
+        const double postG = dsp::dbToGain (-hr);
         const bool tubeEnabled = raw.tubeOn->load() > 0.5f;
         const bool tapeEnabled = raw.tapeOn->load() > 0.5f;
 
@@ -280,16 +266,16 @@ void ControlPanelAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer,
             tape.setParams (raw.tapeDrive->load(), (int) raw.tapeSpeed->load(),
                             raw.tapeLF->load(), raw.tapeHF->load());
 
-        if (preG != 1.0f)
+        if (preG != 1.0)
             for (int c = 0; c < mainCh; ++c) juce::FloatVectorOperations::multiply (main[c], preG, numSamples);
 
         if (osChoice > 0)
         {
-            juce::dsp::AudioBlock<float> mainBlock (main, (size_t) mainCh, (size_t) numSamples);
+            juce::dsp::AudioBlock<double> mainBlock (main, (size_t) mainCh, (size_t) numSamples);
             auto& os = *oversamplers[osChoice - 1];
-            auto up = os.processSamplesUp (juce::dsp::AudioBlock<const float> (mainBlock));
+            auto up = os.processSamplesUp (juce::dsp::AudioBlock<const double> (mainBlock));
 
-            float* upPtr[2]; const int upN = (int) up.getNumSamples();
+            double* upPtr[2]; const int upN = (int) up.getNumSamples();
             for (int c = 0; c < mainCh; ++c) upPtr[c] = up.getChannelPointer ((size_t) c);
             if (tubeEnabled) tube.process (upPtr, mainCh, upN);
             if (tapeEnabled) tape.process (upPtr, mainCh, upN);
@@ -302,7 +288,7 @@ void ControlPanelAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer,
             if (tapeEnabled) tape.process (main, mainCh, numSamples);
         }
 
-        if (postG != 1.0f)
+        if (postG != 1.0)
             for (int c = 0; c < mainCh; ++c) juce::FloatVectorOperations::multiply (main[c], postG, numSamples);
     }
 
@@ -312,32 +298,35 @@ void ControlPanelAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer,
 
     // 6) Circuit Bend --------------------------------------------------------
     {
-        const float cb = raw.circuitBend->load() * 0.01f;
-        if (cb > 0.001f)
+        const double cb = raw.circuitBend->load() * 0.01;
+        if (cb > 0.001)
         {
-            const float bits = juce::jmap (cb, 16.0f, 4.0f);
-            const float steps = std::pow (2.0f, bits - 1.0f);
-            const int   hold  = 1 + (int) std::round (juce::jmap (cb, 0.0f, 8.0f));
-            const float drive = 1.0f + cb * 3.0f;
+            const double bits  = juce::jmap (cb, 16.0, 4.0);
+            const double steps = std::pow (2.0, bits - 1.0);
+            const int    hold  = 1 + (int) std::round (juce::jmap (cb, 0.0, 8.0));
+            const double drive = 1.0 + cb * 3.0;
             for (int c = 0; c < mainCh; ++c)
             {
-                float* x = main[c];
+                double* x = main[c];
                 for (int n = 0; n < numSamples; ++n)
                 {
                     if (cbCounter[c] <= 0) { cbHold[c] = x[n]; cbCounter[c] = hold; }
                     --cbCounter[c];
-                    float q = std::round (cbHold[c] * steps) / steps;
-                    q = dsp::fastTanh (q * drive);
-                    x[n] = x[n] * (1.0f - cb) + q * cb;
+                    double q = std::round (cbHold[c] * steps) / steps;
+                    q = dsp::saturate (q * drive);
+                    x[n] = x[n] * (1.0 - cb) + q * cb;
                 }
             }
         }
     }
 
-    // 7) Output trim ---------------------------------------------------------
-    const float outGain = dsp::dbToGain (raw.outputTrim->load());
-    for (int c = 0; c < mainCh; ++c)
-        juce::FloatVectorOperations::multiply (main[c], outGain, numSamples);
+    // 7) Output trim (per-sample smoothed) -----------------------------------
+    outGainSm.setTargetValue (dsp::dbToGain ((double) raw.outputTrim->load()));
+    for (int n = 0; n < numSamples; ++n)
+    {
+        const double gn = outGainSm.getNextValue();
+        for (int c = 0; c < mainCh; ++c) main[c][n] *= gn;
+    }
 
     // 8) Auto-gain match -----------------------------------------------------
     const bool delta    = raw.delta->load() > 0.5f;
@@ -346,54 +335,124 @@ void ControlPanelAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer,
         double inSum = 0.0, outSum = 0.0;
         for (int c = 0; c < mainCh; ++c)
         {
-            const float* dp = alignedDry.getReadPointer (c);
+            const double* dp = alignedDry.getReadPointer (c);
             for (int n = 0; n < numSamples; ++n) { inSum += dp[n] * dp[n]; outSum += main[c][n] * main[c][n]; }
         }
-        const float invN = 1.0f / (float) (numSamples * mainCh);
-        agInSq  = agCoeff * agInSq  + (1.0f - agCoeff) * (float) (inSum  * invN) + dsp::antiDenormal;
-        agOutSq = agCoeff * agOutSq + (1.0f - agCoeff) * (float) (outSum * invN) + dsp::antiDenormal;
+        const double invN = 1.0 / (double) (numSamples * mainCh);
+        agInSq  = agCoeff * agInSq  + (1.0 - agCoeff) * (inSum  * invN) + dsp::antiDenormal;
+        agOutSq = agCoeff * agOutSq + (1.0 - agCoeff) * (outSum * invN) + dsp::antiDenormal;
 
-        float target = 1.0f;
+        double target = 1.0;
         if (autoGain)
-            target = juce::jlimit (0.25f, 4.0f, std::sqrt (agInSq / juce::jmax (1.0e-9f, agOutSq)));
-        agGainSmoothed += 0.05f * (target - agGainSmoothed);
+            target = juce::jlimit (0.25, 4.0, std::sqrt (agInSq / juce::jmax (1.0e-12, agOutSq)));
+        agGainSmoothed += 0.05 * (target - agGainSmoothed);
 
         if (autoGain && ! delta)
             for (int c = 0; c < mainCh; ++c) juce::FloatVectorOperations::multiply (main[c], agGainSmoothed, numSamples);
 
-        autoGainDbAtomic.store (dsp::gainToDb (autoGain ? agGainSmoothed : 1.0f), std::memory_order_relaxed);
+        autoGainDbAtomic.store ((float) dsp::gainToDb (autoGain ? agGainSmoothed : 1.0), std::memory_order_relaxed);
     }
 
     // 9) Delta / Dry-Wet -----------------------------------------------------
     if (delta)
     {
-        // Hear exactly what the plugin added or removed (processed - dry).
         for (int c = 0; c < mainCh; ++c)
         {
-            const float* dp = alignedDry.getReadPointer (c);
-            float* x = main[c];
-            for (int n = 0; n < numSamples; ++n) x[n] = (x[n] - dp[n]) * 2.0f;
+            const double* dp = alignedDry.getReadPointer (c);
+            double* x = main[c];
+            for (int n = 0; n < numSamples; ++n) x[n] = (x[n] - dp[n]) * 2.0;
         }
     }
     else
     {
-        float dg, wg; dsp::equalPower (raw.mix->load() * 0.01f, dg, wg);
-        for (int c = 0; c < mainCh; ++c)
+        mixSm.setTargetValue ((double) raw.mix->load() * 0.01);
+        for (int n = 0; n < numSamples; ++n)
         {
-            const float* dp = alignedDry.getReadPointer (c);
-            float* x = main[c];
-            for (int n = 0; n < numSamples; ++n) x[n] = dg * dp[n] + wg * x[n];
+            const double m = mixSm.getNextValue();
+            double dg, wg; dsp::equalPower (m, dg, wg);
+            for (int c = 0; c < mainCh; ++c)
+                main[c][n] = dg * alignedDry.getReadPointer (c)[n] + wg * main[c][n];
         }
     }
 
-    // Mono → duplicate handled by host; ensure any unused channel is cleared.
-    for (int c = mainCh; c < buffer.getNumChannels(); ++c)
-        buffer.clear (c, 0, numSamples);
-
     // ---- output meter + analyzer ------------------------------------------
-    const float* op[2] = { main[0], mainCh > 1 ? main[1] : main[0] };
+    const double* op[2] = { main[0], mainCh > 1 ? main[1] : main[0] };
     outMeter.process (op, mainCh, numSamples);
     analyzer.push (op, mainCh, numSamples);
+}
+
+//==============================================================================
+void ControlPanelAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer&)
+{
+    juce::ScopedNoDenormals noDenormals;
+
+    auto mainIO = getBusBuffer (buffer, true, 0);
+    const int mainCh     = juce::jmin (2, mainIO.getNumChannels());
+    const int numSamples = buffer.getNumSamples();
+    if (mainCh == 0 || numSamples == 0) return;
+
+    // Widen main input to the double work buffer.
+    double* wMain[2] = { nullptr, nullptr };
+    for (int c = 0; c < mainCh; ++c)
+    {
+        wMain[c] = workBuffer.getWritePointer (c);
+        const float* src = mainIO.getReadPointer (c);
+        for (int n = 0; n < numSamples; ++n) wMain[c][n] = (double) src[n];
+    }
+
+    // Widen sidechain (optional).
+    const double* scPtrs[2] = { nullptr, nullptr };
+    int scCh = 0;
+    if (auto* scBusPtr = getBus (true, 1); scBusPtr != nullptr && scBusPtr->isEnabled())
+    {
+        auto scBuf = getBusBuffer (buffer, true, 1);
+        scCh = juce::jmin (2, scBuf.getNumChannels());
+        for (int c = 0; c < scCh; ++c)
+        {
+            double* d = scWorkBuffer.getWritePointer (c);
+            const float* s = scBuf.getReadPointer (c);
+            for (int n = 0; n < numSamples; ++n) d[n] = (double) s[n];
+            scPtrs[c] = d;
+        }
+    }
+
+    processDouble (wMain, mainCh, numSamples, scCh > 0 ? scPtrs : nullptr, scCh);
+
+    // Narrow back to 32-bit.
+    for (int c = 0; c < mainCh; ++c)
+    {
+        float* dst = mainIO.getWritePointer (c);
+        for (int n = 0; n < numSamples; ++n) dst[n] = (float) wMain[c][n];
+    }
+    for (int c = mainCh; c < buffer.getNumChannels(); ++c)
+        buffer.clear (c, 0, numSamples);
+}
+
+void ControlPanelAudioProcessor::processBlock (juce::AudioBuffer<double>& buffer, juce::MidiBuffer&)
+{
+    juce::ScopedNoDenormals noDenormals;
+
+    auto mainIO = getBusBuffer (buffer, true, 0);
+    const int mainCh     = juce::jmin (2, mainIO.getNumChannels());
+    const int numSamples = buffer.getNumSamples();
+    if (mainCh == 0 || numSamples == 0) return;
+
+    double* main[2] = { nullptr, nullptr };
+    for (int c = 0; c < mainCh; ++c) main[c] = mainIO.getWritePointer (c);
+
+    const double* scPtrs[2] = { nullptr, nullptr };
+    int scCh = 0;
+    if (auto* scBusPtr = getBus (true, 1); scBusPtr != nullptr && scBusPtr->isEnabled())
+    {
+        auto scBuf = getBusBuffer (buffer, true, 1);
+        scCh = juce::jmin (2, scBuf.getNumChannels());
+        for (int c = 0; c < scCh; ++c) scPtrs[c] = scBuf.getReadPointer (c);
+    }
+
+    processDouble (main, mainCh, numSamples, scCh > 0 ? scPtrs : nullptr, scCh);
+
+    for (int c = mainCh; c < buffer.getNumChannels(); ++c)
+        buffer.clear (c, 0, numSamples);
 }
 
 //==============================================================================
@@ -452,8 +511,6 @@ void ControlPanelAudioProcessor::getStateInformation (juce::MemoryBlock& destDat
     state.setProperty ("serial", serial, nullptr);
     state.setProperty ("activeSnapshot", activeSnapshot, nullptr);
 
-    // Persist snapshots alongside the parameter children (do NOT clear the
-    // parameter nodes — copyState() already holds them).
     for (int i = 0; i < numSnapshots; ++i)
         if (snapshots[(size_t) i].isValid())
         {
@@ -488,7 +545,7 @@ void ControlPanelAudioProcessor::setStateInformation (const void* data, int size
         {
             if (snapWrap.getNumChildren() > 0)
                 snapshots[(size_t) i] = snapWrap.getChild (0).createCopy();
-            tree.removeChild (snapWrap, nullptr); // strip wrappers, keep PARAM nodes
+            tree.removeChild (snapWrap, nullptr);
         }
     }
 

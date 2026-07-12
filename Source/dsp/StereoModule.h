@@ -6,7 +6,7 @@
 namespace cfm::dsp
 {
     /**
-        Mid/Side stereo finishing: Mono Maker + Width.
+        Mid/Side stereo finishing: Mono Maker + Width (64-bit).
 
         Mono Maker high-passes the Side channel so everything below the chosen
         frequency collapses to mono — tight, centred, phase-solid low end.
@@ -26,27 +26,27 @@ namespace cfm::dsp
 
         void reset() noexcept { for (auto& f : sideHp) f.reset(); }
 
-        void setParams (float widthPct, float monoFreqHz) noexcept
+        void setParams (double widthPct, double monoFreqHz) noexcept
         {
-            width    = juce::jlimit (0.0f, 2.0f, widthPct * 0.01f);
+            width    = juce::jlimit (0.0, 2.0, widthPct * 0.01);
             monoFreq = monoFreqHz;
-            monoOn   = monoFreqHz >= 1.0f;
+            monoOn   = monoFreqHz >= 1.0;
             if (monoOn && monoFreq != lastMono) { lastMono = monoFreq; updateFilter(); }
         }
 
-        void process (float* const* data, int numChannels, int numSamples) noexcept
+        void process (double* const* data, int numChannels, int numSamples) noexcept
         {
             if (numChannels < 2) return; // stereo-only effect
-            float* L = data[0];
-            float* R = data[1];
+            double* L = data[0];
+            double* R = data[1];
 
-            const bool doWidth = std::abs (width - 1.0f) > 1.0e-4f;
+            const bool doWidth = std::abs (width - 1.0) > 1.0e-6;
             if (! doWidth && ! monoOn) return;
 
             for (int n = 0; n < numSamples; ++n)
             {
-                float mid  = 0.5f * (L[n] + R[n]);
-                float side = 0.5f * (L[n] - R[n]);
+                double mid  = 0.5 * (L[n] + R[n]);
+                double side = 0.5 * (L[n] - R[n]);
 
                 if (monoOn) side = sideHp[0].processSample (side); // remove lows from Side
                 side *= width;
@@ -60,14 +60,14 @@ namespace cfm::dsp
     private:
         void updateFilter() noexcept
         {
-            const float f = juce::jlimit (20.0f, 400.0f, monoFreq);
-            auto c = juce::dsp::IIR::Coefficients<float>::makeHighPass (sampleRate, f, 0.707f);
+            const double f = juce::jlimit (20.0, 400.0, monoFreq);
+            auto c = juce::dsp::IIR::Coefficients<double>::makeHighPass (sampleRate, f, 0.707);
             for (auto& flt : sideHp) flt.coefficients = c;
         }
 
         double sampleRate = 44100.0;
-        float  width = 1.0f, monoFreq = 0.0f, lastMono = -1.0f;
+        double width = 1.0, monoFreq = 0.0, lastMono = -1.0;
         bool   monoOn = false;
-        std::array<juce::dsp::IIR::Filter<float>, 1> sideHp;
+        std::array<juce::dsp::IIR::Filter<double>, 1> sideHp;
     };
 }

@@ -6,14 +6,19 @@
 /**
     Small shared helpers used across the Master Control Panel DSP modules.
 
-    Everything here is real-time safe: no allocation, no locking, no logging.
+    The whole internal signal path runs in double precision (`cfm::dsp::Sample`)
+    for maximum headroom and numerical accuracy — filter states, envelopes and
+    saturators never lose bits to 32-bit rounding, and coefficients are computed
+    at 64-bit. Everything here is real-time safe: no allocation, no locking.
 */
 namespace cfm::dsp
 {
-    // Fast, branch-free denormal guard. We also flush denormals globally via
-    // juce::ScopedNoDenormals in the processor, but individual feedback paths
-    // (envelopes, filter states) benefit from an explicit tiny-DC offset.
-    inline constexpr float antiDenormal = 1.0e-20f;
+    // Internal processing precision. 64-bit throughout for reference fidelity.
+    using Sample = double;
+
+    // Tiny anti-denormal DC used on feedback paths (envelopes, filter states).
+    // Global flush-to-zero is also enabled via juce::ScopedNoDenormals.
+    inline constexpr double antiDenormal = 1.0e-30;
 
     template <typename T>
     inline T flushDenorm (T x) noexcept
@@ -21,31 +26,25 @@ namespace cfm::dsp
         return x + (T) antiDenormal - (T) antiDenormal;
     }
 
-    // Cheap tanh approximation — accurate to ~1e-3 over the audio range and
-    // considerably faster than std::tanh in a per-sample loop. Odd-symmetric,
-    // monotonic, and bounded, so it is well behaved as a saturating shaper.
-    inline float fastTanh (float x) noexcept
-    {
-        const float x2 = x * x;
-        const float a  = x * (135135.0f + x2 * (17325.0f + x2 * (378.0f + x2)));
-        const float b  = 135135.0f + x2 * (62370.0f + x2 * (3150.0f + x2 * 28.0f));
-        return juce::jlimit (-1.0f, 1.0f, a / b);
-    }
+    // Accurate, bounded, odd-symmetric saturator. We deliberately use the exact
+    // std::tanh (not a rational approximation) so the harmonic series is correct;
+    // the nonlinear stages run oversampled, so accuracy — not raw speed — wins.
+    inline double saturate (double x) noexcept { return std::tanh (x); }
 
-    inline float dbToGain (float db) noexcept { return std::pow (10.0f, db * 0.05f); }
-    inline float gainToDb (float g)  noexcept { return 20.0f * std::log10 (juce::jmax (1.0e-9f, g)); }
+    inline double dbToGain (double db) noexcept { return std::pow (10.0, db * 0.05); }
+    inline double gainToDb (double g)  noexcept { return 20.0 * std::log10 (juce::jmax (1.0e-12, g)); }
 
     // One-pole smoothing coefficient for a given time constant (seconds).
-    inline float onePoleCoeff (float timeSeconds, double sampleRate) noexcept
+    inline double onePoleCoeff (double timeSeconds, double sampleRate) noexcept
     {
-        if (timeSeconds <= 0.0f) return 0.0f;
-        return std::exp (-1.0f / (timeSeconds * (float) sampleRate));
+        if (timeSeconds <= 0.0) return 0.0;
+        return std::exp (-1.0 / (timeSeconds * sampleRate));
     }
 
-    // Equal-power-ish crossfade used for dry/wet and parallel blends.
-    inline void equalPower (float mix, float& dryGain, float& wetGain) noexcept
+    // Equal-power crossfade used for dry/wet and parallel blends.
+    inline void equalPower (double mix, double& dryGain, double& wetGain) noexcept
     {
-        dryGain = std::cos (mix * juce::MathConstants<float>::halfPi);
-        wetGain = std::sin (mix * juce::MathConstants<float>::halfPi);
+        dryGain = std::cos (mix * juce::MathConstants<double>::halfPi);
+        wetGain = std::sin (mix * juce::MathConstants<double>::halfPi);
     }
 }

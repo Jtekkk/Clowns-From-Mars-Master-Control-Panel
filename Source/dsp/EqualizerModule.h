@@ -6,17 +6,18 @@
 namespace cfm::dsp
 {
     /**
-        Mastering-grade five-band parametric EQ.
+        Mastering-grade five-band parametric EQ (64-bit biquads).
 
           band 0 : low shelf     band 1..3 : peak     band 4 : high shelf
           + variable High-Pass and Low-Pass (12 dB/oct, Butterworth)
           + AIR   : gentle high shelf around 15 kHz for open top end
           + TIGHT : low-shelf clean-up that de-muds the 250 Hz region
 
-        Curves use the RBJ analog-matched biquad design and are clamped away
-        from Nyquist so boosts stay clean at every sample rate. Q can follow
-        the classic Proportional-Q law (broad for small moves, tighter for big
-        ones) or stay Constant-Q, switchable globally.
+        Curves use the RBJ analog-matched biquad design computed and run in
+        double precision, so boosts stay clean and phase-accurate right down to
+        the lowest bands where 32-bit biquads lose resolution. Q can follow the
+        classic Proportional-Q law (broad for small moves, tighter for big ones)
+        or stay Constant-Q, switchable globally.
     */
     class EqualizerModule
     {
@@ -42,12 +43,12 @@ namespace cfm::dsp
 
         struct Settings
         {
-            bool  eqOn = true;
-            bool  hpOn = false;  float hpFreq = 30.f;
-            bool  lpOn = false;  float lpFreq = 20000.f;
-            bool  propQ = true;
-            float air = 0.f, tight = 0.f;
-            struct Band { bool on; float freq, gain, q; };
+            bool   eqOn = true;
+            bool   hpOn = false;  double hpFreq = 30.0;
+            bool   lpOn = false;  double lpFreq = 20000.0;
+            bool   propQ = true;
+            double air = 0.0, tight = 0.0;
+            struct Band { bool on; double freq, gain, q; };
             std::array<Band, numBands> band {};
         };
 
@@ -60,21 +61,21 @@ namespace cfm::dsp
             active = pending;
 
             const double nyq = sampleRate * 0.5;
-            auto clampF = [nyq] (float f) { return (float) juce::jlimit (10.0, nyq * 0.98, (double) f); };
+            auto clampF = [nyq] (double f) { return juce::jlimit (10.0, nyq * 0.98, f); };
 
-            using Coefs = juce::dsp::IIR::Coefficients<float>;
+            using Coefs = juce::dsp::IIR::Coefficients<double>;
 
             if (active.hpOn)
-                assignAll (hp, Coefs::makeHighPass (sampleRate, clampF (active.hpFreq), 0.707f));
+                assignAll (hp, Coefs::makeHighPass (sampleRate, clampF (active.hpFreq), 0.707));
             if (active.lpOn)
-                assignAll (lp, Coefs::makeLowPass  (sampleRate, clampF (active.lpFreq), 0.707f));
+                assignAll (lp, Coefs::makeLowPass  (sampleRate, clampF (active.lpFreq), 0.707));
 
             for (int b = 0; b < numBands; ++b)
             {
                 const auto& bs = active.band[b];
-                const float f  = clampF (bs.freq);
-                const float g  = dbToGain (bs.gain);
-                const float q  = effectiveQ (bs.q, bs.gain);
+                const double f = clampF (bs.freq);
+                const double g = dbToGain (bs.gain);
+                const double q = effectiveQ (bs.q, bs.gain);
 
                 Coefs::Ptr c;
                 if (b == 0)                 c = Coefs::makeLowShelf  (sampleRate, f, q, g);
@@ -84,31 +85,31 @@ namespace cfm::dsp
             }
 
             // AIR — fixed 15 kHz high shelf, up to +6 dB.
-            assignAll (airF, Coefs::makeHighShelf (sampleRate, clampF (15000.f), 0.6f,
-                                                   dbToGain (active.air * 0.06f * 6.f)));
+            assignAll (airF, Coefs::makeHighShelf (sampleRate, clampF (15000.0), 0.6,
+                                                   dbToGain (active.air * 0.06 * 6.0)));
             // TIGHT — 250 Hz low shelf cut, up to -6 dB, cleans low mud.
-            assignAll (tightF, Coefs::makeLowShelf (sampleRate, 250.f, 0.7f,
-                                                    dbToGain (-active.tight * 0.06f * 6.f)));
+            assignAll (tightF, Coefs::makeLowShelf (sampleRate, 250.0, 0.7,
+                                                    dbToGain (-active.tight * 0.06 * 6.0)));
         }
 
-        void process (float* const* data, int numChannels, int numSamples) noexcept
+        void process (double* const* data, int numChannels, int numSamples) noexcept
         {
             if (! active.eqOn) return;
             const int nCh = juce::jmin (numChannels, channels);
 
             for (int ch = 0; ch < nCh; ++ch)
             {
-                float* x = data[ch];
+                double* x = data[ch];
                 for (int n = 0; n < numSamples; ++n)
                 {
-                    float s = x[n];
+                    double s = x[n];
                     if (active.hpOn) s = hp[ch].processSample (s);
                     if (active.lpOn) s = lp[ch].processSample (s);
                     for (int b = 0; b < numBands; ++b)
                         if (active.band[b].on)
                             s = bands[b][ch].processSample (s);
-                    if (active.air   > 0.001f) s = airF[ch].processSample (s);
-                    if (active.tight > 0.001f) s = tightF[ch].processSample (s);
+                    if (active.air   > 0.001) s = airF[ch].processSample (s);
+                    if (active.tight > 0.001) s = tightF[ch].processSample (s);
                     x[n] = flushDenorm (s);
                 }
                 for (int b = 0; b < numBands; ++b) bands[b][ch].snapToZero();
@@ -121,7 +122,7 @@ namespace cfm::dsp
         double magnitudeAt (double freq) const noexcept
         {
             double m = 1.0;
-            auto mul = [&] (const juce::dsp::IIR::Coefficients<float>::Ptr& c)
+            auto mul = [&] (const juce::dsp::IIR::Coefficients<double>::Ptr& c)
             {
                 if (c != nullptr)
                     m *= c->getMagnitudeForFrequency (freq, sampleRate);
@@ -130,21 +131,21 @@ namespace cfm::dsp
             if (active.lpOn) mul (lp[0].coefficients);
             for (int b = 0; b < numBands; ++b)
                 if (active.band[b].on) mul (bands[b][0].coefficients);
-            if (active.air   > 0.001f) mul (airF[0].coefficients);
-            if (active.tight > 0.001f) mul (tightF[0].coefficients);
+            if (active.air   > 0.001) mul (airF[0].coefficients);
+            if (active.tight > 0.001) mul (tightF[0].coefficients);
             return m;
         }
 
     private:
         static constexpr int kMax = 2;
-        using Filter = juce::dsp::IIR::Filter<float>;
+        using Filter = juce::dsp::IIR::Filter<double>;
 
-        float effectiveQ (float baseQ, float gainDb) const noexcept
+        double effectiveQ (double baseQ, double gainDb) const noexcept
         {
             if (! active.propQ) return baseQ;
             // Proportional-Q: broaden small moves, tighten large ones.
-            const float norm = juce::jlimit (0.f, 1.f, std::abs (gainDb) / 18.f);
-            return baseQ * (0.5f + 1.5f * norm);
+            const double norm = juce::jlimit (0.0, 1.0, std::abs (gainDb) / 18.0);
+            return baseQ * (0.5 + 1.5 * norm);
         }
 
         template <typename Arr, typename Ptr>

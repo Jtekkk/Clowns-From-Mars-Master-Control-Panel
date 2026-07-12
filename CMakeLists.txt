@@ -86,10 +86,12 @@ target_compile_definitions(MasterControlPanel PUBLIC
     # DSP quality: keep denormals flushed for predictable low-level behaviour.
     JUCE_DSP_USE_SHARED_FFTW=0)
 
-# Aggressive but safe optimisation for the audio DSP.
+# Optimise hard, but keep IEEE-correct floating point: -ffast-math would let the
+# compiler reorder/contract the DSP and drop NaN/denormal semantics, which is the
+# opposite of what a reference-fidelity, double-precision path wants.
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(MasterControlPanel PRIVATE
-        $<$<CONFIG:Release>:-O3 -ffast-math -fno-finite-math-only>)
+        $<$<CONFIG:Release>:-O3 -fno-math-errno>)
 endif()
 
 if(TT_ENABLE_LTO)

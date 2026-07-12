@@ -29,26 +29,26 @@ namespace cfm::dsp
             juce::Random rng (serial ^ 0x5bd1e995LL);
             for (int ch = 0; ch < maxChannels; ++ch)
                 for (int s = 0; s < slots; ++s)
-                    unit[ch][s] = rng.nextFloat() * 2.0f - 1.0f; // [-1, 1]
+                    unit[ch][s] = rng.nextDouble() * 2.0 - 1.0; // [-1, 1]
         }
 
         // amountPercent: 0..100 from the Drift control.
-        void setAmount (float amountPercent) noexcept
+        void setAmount (double amountPercent) noexcept
         {
-            amount = juce::jlimit (0.0f, 1.0f, amountPercent * 0.01f);
+            amount = juce::jlimit (0.0, 1.0, amountPercent * 0.01);
         }
 
         // Returns a per-channel multiplicative deviation around 1.0.
         // maxDeviation is the full-scale spread (e.g. 0.05 == ±5%).
-        float factor (int channel, int slot, float maxDeviation) const noexcept
+        double factor (int channel, int slot, double maxDeviation) const noexcept
         {
             const int ch = channel % maxChannels;
             const int s  = slot % slots;
-            return 1.0f + unit[ch][s] * maxDeviation * amount;
+            return 1.0 + unit[ch][s] * maxDeviation * amount;
         }
 
         // Additive deviation (e.g. for bias offsets), symmetric around 0.
-        float offset (int channel, int slot, float maxOffset) const noexcept
+        double offset (int channel, int slot, double maxOffset) const noexcept
         {
             const int ch = channel % maxChannels;
             const int s  = slot % slots;
@@ -56,7 +56,7 @@ namespace cfm::dsp
         }
 
     private:
-        std::array<std::array<float, slots>, maxChannels> unit { {} };
-        float amount = 0.25f;
+        std::array<std::array<double, slots>, maxChannels> unit { {} };
+        double amount = 0.25;
     };
 }

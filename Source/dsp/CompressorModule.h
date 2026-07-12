@@ -7,7 +7,7 @@
 namespace cfm::dsp
 {
     /**
-        Two-stage, transformer-balanced mastering compressor.
+        Two-stage, transformer-balanced mastering compressor (64-bit).
 
         Topology (decoupled, "smooth-the-gain"):
           detector (RMS, sidechain-HP'd)  ->  soft-knee gain computer
@@ -16,10 +16,10 @@ namespace cfm::dsp
                    * optical  : program-dependent release, gluey
              ->  blended, applied, makeup, then transformer colour.
 
-        Modes: Stereo (linked), Dual-Mono (independent), Mid/Side.
-        Character: Nickel (clean/airy), Iron (mid focus), Steel (harmonic).
-        Program-dependent optical release models a real photocell's memory,
-        which is why it behaves differently from a static ratio curve.
+        Everything — detector, envelopes, gain computer — runs in double so the
+        gain signal is smooth to the bit and never quantises the low-level tail.
+        Modes: Stereo (linked), Dual-Mono, Mid/Side. Character: Nickel (air),
+        Iron (mids), Steel (harmonics).
     */
     class CompressorModule
     {
@@ -34,67 +34,66 @@ namespace cfm::dsp
 
         void reset() noexcept
         {
-            for (auto& v : envD) v = 0.0f;
-            for (auto& v : envO) v = 0.0f;
-            for (auto& v : rms)  v = 0.0f;
+            for (auto& v : envD) v = 0.0;
+            for (auto& v : envO) v = 0.0;
+            for (auto& v : rms)  v = 0.0;
             for (auto& f : scHp) f.reset();
-            for (auto& z : colZ) z = 0.0f;
-            grReadout = 0.0f;
+            for (auto& z : colZ) z = 0.0;
+            grReadout = 0.0;
         }
 
         void setDrift (const DriftModel* d) noexcept { drift = d; }
 
         struct Settings
         {
-            bool  on = false;
-            float threshold = -12.f, ratio = 2.f, attackMs = 20.f, releaseMs = 200.f, knee = 6.f;
-            float makeup = 0.f;  bool autoMakeup = true;
-            int   mode = 0;       // 0 stereo, 1 dual-mono, 2 mid/side
-            float optBlend = 0.5f; // 0 discrete .. 1 optical
-            float mix = 1.0f;      // parallel
-            float scHpFreq = 20.f;
-            int   transformer = 0; // 0 nickel, 1 iron, 2 steel
+            bool   on = false;
+            double threshold = -12.0, ratio = 2.0, attackMs = 20.0, releaseMs = 200.0, knee = 6.0;
+            double makeup = 0.0;  bool autoMakeup = true;
+            int    mode = 0;       // 0 stereo, 1 dual-mono, 2 mid/side
+            double optBlend = 0.5; // 0 discrete .. 1 optical
+            double mix = 1.0;      // parallel
+            double scHpFreq = 20.0;
+            int    transformer = 0; // 0 nickel, 1 iron, 2 steel
         };
 
         void setSettings (const Settings& s) noexcept
         {
             cfg = s;
             // Ballistic coefficients.
-            atkD = std::exp (-1.0f / (juce::jmax (0.05f, cfg.attackMs)  * 0.001f * (float) sampleRate));
-            relD = std::exp (-1.0f / (juce::jmax (1.0f,  cfg.releaseMs) * 0.001f * (float) sampleRate));
-            atkO = std::exp (-1.0f / (juce::jmax (5.0f,  cfg.attackMs * 1.6f) * 0.001f * (float) sampleRate));
-            rmsA = std::exp (-1.0f / (0.003f * (float) sampleRate)); // ~3 ms RMS window
+            atkD = std::exp (-1.0 / (juce::jmax (0.05, cfg.attackMs)  * 0.001 * sampleRate));
+            relD = std::exp (-1.0 / (juce::jmax (1.0,  cfg.releaseMs) * 0.001 * sampleRate));
+            atkO = std::exp (-1.0 / (juce::jmax (5.0,  cfg.attackMs * 1.6) * 0.001 * sampleRate));
+            rmsA = std::exp (-1.0 / (0.003 * sampleRate)); // ~3 ms RMS window
 
             // Static auto-makeup: restore roughly half of the curve's pull on a 0 dB peak.
-            const float grAt0 = computeGR (0.0f);
-            autoMk = dbToGain (-0.5f * grAt0);
+            const double grAt0 = computeGR (0.0);
+            autoMk = dbToGain (-0.5 * grAt0);
 
             if (cfg.scHpFreq != lastScFreq) { lastScFreq = cfg.scHpFreq; updateDetectorFilter(); }
         }
 
         // scData may be nullptr (no external sidechain).
-        void process (float* const* data, int numChannels, int numSamples,
-                      const float* const* scData, int scChannels) noexcept
+        void process (double* const* data, int numChannels, int numSamples,
+                      const double* const* scData, int scChannels) noexcept
         {
-            if (! cfg.on) { grReadout = 0.0f; return; }
+            if (! cfg.on) { grReadout = 0.0; return; }
 
             const int nCh = juce::jmin (numChannels, channels);
             const bool useExt = (scData != nullptr && scChannels > 0);
-            float dryMix, wetMix; equalPower (cfg.mix, dryMix, wetMix);
+            double dryMix, wetMix; equalPower (cfg.mix, dryMix, wetMix);
 
-            float blockGrDb = 0.0f;
+            double blockGrDb = 0.0;
 
             for (int n = 0; n < numSamples; ++n)
             {
-                // --- Build voice signals & detector keys per mode -----------
-                float vSig[2] { 0.f, 0.f }, vKey[2] { 0.f, 0.f };
-                int   voices  = 1;
+                double vSig[2] { 0.0, 0.0 }, vKey[2] { 0.0, 0.0 };
+                int    voices  = 1;
 
-                float inL = data[0][n];
-                float inR = (nCh > 1 ? data[1][n] : inL);
+                const double inL = data[0][n];
+                const double inR = (nCh > 1 ? data[1][n] : inL);
 
-                float scL = useExt ? scData[0][n] : inL;
-                float scR = useExt ? (scChannels > 1 ? scData[1][n] : scL) : inR;
+                double scL = useExt ? scData[0][n] : inL;
+                double scR = useExt ? (scChannels > 1 ? scData[1][n] : scL) : inR;
                 scL = scHp[0].processSample (scL);
                 scR = scHp[1].processSample (scR);
 
@@ -102,8 +101,8 @@ namespace cfm::dsp
                 {
                     case 2: // Mid/Side
                         voices  = 2;
-                        vSig[0] = 0.5f * (inL + inR); vSig[1] = 0.5f * (inL - inR);
-                        vKey[0] = 0.5f * (scL + scR); vKey[1] = 0.5f * (scL - scR);
+                        vSig[0] = 0.5 * (inL + inR); vSig[1] = 0.5 * (inL - inR);
+                        vKey[0] = 0.5 * (scL + scR); vKey[1] = 0.5 * (scL - scR);
                         break;
                     case 1: // Dual-Mono
                         voices  = 2;
@@ -112,45 +111,40 @@ namespace cfm::dsp
                         break;
                     default: // Stereo (linked)
                         voices  = 1;
-                        vSig[0] = 0.f; // unused; we apply the shared gain to L/R directly
                         vKey[0] = juce::jmax (std::abs (scL), std::abs (scR));
                         break;
                 }
 
-                float gain[2] { 1.f, 1.f };
+                double gain[2] { 1.0, 1.0 };
                 for (int v = 0; v < voices; ++v)
                 {
-                    // RMS-ish detector.
-                    const float key = (cfg.mode == 0) ? vKey[0] : vKey[v];
-                    rms[v] = rmsA * rms[v] + (1.0f - rmsA) * (key * key) + antiDenormal;
-                    const float levelDb = 10.0f * std::log10 (juce::jmax (1.0e-9f, rms[v]));
+                    const double key = (cfg.mode == 0) ? vKey[0] : vKey[v];
+                    rms[v] = rmsA * rms[v] + (1.0 - rmsA) * (key * key) + antiDenormal;
+                    const double levelDb = 10.0 * std::log10 (juce::jmax (1.0e-12, rms[v]));
 
-                    const float targetGr = computeGR (levelDb); // <= 0 dB
+                    const double targetGr = computeGR (levelDb); // <= 0 dB
 
-                    // Discrete envelope (user ballistics).
-                    if (targetGr < envD[v]) envD[v] = atkD * envD[v] + (1.0f - atkD) * targetGr;
-                    else                    envD[v] = relD * envD[v] + (1.0f - relD) * targetGr;
+                    if (targetGr < envD[v]) envD[v] = atkD * envD[v] + (1.0 - atkD) * targetGr;
+                    else                    envD[v] = relD * envD[v] + (1.0 - relD) * targetGr;
 
-                    // Optical envelope: program-dependent release.
-                    const float depth   = juce::jlimit (0.0f, 1.0f, -targetGr / 24.0f);
-                    const float relMsO  = juce::jmap (depth, 60.0f, 900.0f); // longer tail when hit harder
-                    const float relO    = std::exp (-1.0f / (relMsO * 0.001f * (float) sampleRate));
-                    if (targetGr < envO[v]) envO[v] = atkO * envO[v] + (1.0f - atkO) * targetGr;
-                    else                    envO[v] = relO * envO[v] + (1.0f - relO) * targetGr;
+                    const double depth  = juce::jlimit (0.0, 1.0, -targetGr / 24.0);
+                    const double relMsO = juce::jmap (depth, 60.0, 900.0);
+                    const double relO   = std::exp (-1.0 / (relMsO * 0.001 * sampleRate));
+                    if (targetGr < envO[v]) envO[v] = atkO * envO[v] + (1.0 - atkO) * targetGr;
+                    else                    envO[v] = relO * envO[v] + (1.0 - relO) * targetGr;
 
-                    const float grDb = envD[v] * (1.0f - cfg.optBlend) + envO[v] * cfg.optBlend;
+                    const double grDb = envD[v] * (1.0 - cfg.optBlend) + envO[v] * cfg.optBlend;
                     gain[v] = dbToGain (grDb);
                     blockGrDb = juce::jmin (blockGrDb, grDb);
                 }
 
-                const float makeup = cfg.autoMakeup ? autoMk : dbToGain (cfg.makeup);
+                const double makeup = cfg.autoMakeup ? autoMk : dbToGain (cfg.makeup);
 
-                // --- Apply, colour, recombine, parallel-mix -----------------
-                float outL, outR;
+                double outL, outR;
                 if (cfg.mode == 2) // M/S
                 {
-                    const float m = colour (vSig[0] * gain[0] * makeup, 0);
-                    const float s = colour (vSig[1] * gain[1] * makeup, 1);
+                    const double m = colour (vSig[0] * gain[0] * makeup, 0);
+                    const double s = colour (vSig[1] * gain[1] * makeup, 1);
                     outL = m + s; outR = m - s;
                 }
                 else if (cfg.mode == 1) // dual-mono
@@ -173,47 +167,46 @@ namespace cfm::dsp
         }
 
         // For the gain-reduction meter (dB, <= 0).
-        float getGainReductionDb() const noexcept { return grReadout; }
+        double getGainReductionDb() const noexcept { return grReadout; }
 
     private:
         static constexpr int kMax = 2;
 
-        float computeGR (float levelDb) const noexcept
+        double computeGR (double levelDb) const noexcept
         {
-            const float over = levelDb - cfg.threshold;
-            const float W    = juce::jmax (0.0001f, cfg.knee);
-            const float slope = (1.0f / cfg.ratio) - 1.0f; // <= 0
-            if (over <= -W * 0.5f) return 0.0f;
-            if (over >=  W * 0.5f) return slope * over;
-            const float x = over + W * 0.5f;
-            return slope * (x * x) / (2.0f * W);
+            const double over  = levelDb - cfg.threshold;
+            const double W     = juce::jmax (0.0001, cfg.knee);
+            const double slope = (1.0 / cfg.ratio) - 1.0; // <= 0
+            if (over <= -W * 0.5) return 0.0;
+            if (over >=  W * 0.5) return slope * over;
+            const double x = over + W * 0.5;
+            return slope * (x * x) / (2.0 * W);
         }
 
         // Transformer voicing — subtle, program-following colour on the output.
-        float colour (float x, int ch) noexcept
+        double colour (double x, int ch) noexcept
         {
-            const float d = drift ? drift->factor (ch, 5, 0.04f) : 1.0f;
-            float drive, tiltHz, tiltGain;
+            const double d = drift ? drift->factor (ch, 5, 0.04) : 1.0;
+            double drive, tiltHz, tiltGain;
             switch (cfg.transformer)
             {
-                case 1: drive = 1.6f; tiltHz = 900.f;  tiltGain = 1.10f; break; // Iron: mids
-                case 2: drive = 2.4f; tiltHz = 1500.f; tiltGain = 1.00f; break; // Steel: harmonics
-                default: drive = 1.1f; tiltHz = 6000.f; tiltGain = 1.08f; break; // Nickel: air
+                case 1: drive = 1.6; tiltHz = 900.0;  tiltGain = 1.10; break; // Iron: mids
+                case 2: drive = 2.4; tiltHz = 1500.0; tiltGain = 1.00; break; // Steel: harmonics
+                default: drive = 1.1; tiltHz = 6000.0; tiltGain = 1.08; break; // Nickel: air
             }
             drive *= d;
-            const float sat = fastTanh (x * drive) / drive;
+            const double sat = saturate (x * drive) / drive;
 
-            // one-pole low/high split for a gentle voicing tilt
-            const float a = 1.0f - std::exp (-2.0f * juce::MathConstants<float>::pi * tiltHz / (float) sampleRate);
+            const double a = 1.0 - std::exp (-2.0 * juce::MathConstants<double>::pi * tiltHz / sampleRate);
             colZ[ch] = colZ[ch] + a * (sat - colZ[ch]);
-            const float low = colZ[ch], high = sat - low;
+            const double low = colZ[ch], high = sat - low;
             return low + high * tiltGain;
         }
 
         void updateDetectorFilter() noexcept
         {
-            auto c = juce::dsp::IIR::Coefficients<float>::makeHighPass (
-                        sampleRate, juce::jlimit (20.0f, (float) (sampleRate * 0.45), cfg.scHpFreq), 0.707f);
+            auto c = juce::dsp::IIR::Coefficients<double>::makeHighPass (
+                        sampleRate, juce::jlimit (20.0, sampleRate * 0.45, cfg.scHpFreq), 0.707);
             for (auto& f : scHp) f.coefficients = c;
         }
 
@@ -221,11 +214,11 @@ namespace cfm::dsp
         int    channels   = 2;
 
         Settings cfg;
-        float atkD = 0.f, relD = 0.f, atkO = 0.f, rmsA = 0.f, autoMk = 1.0f, lastScFreq = -1.f;
+        double atkD = 0.0, relD = 0.0, atkO = 0.0, rmsA = 0.0, autoMk = 1.0, lastScFreq = -1.0;
 
-        std::array<float, kMax> envD { {} }, envO { {} }, rms { {} }, colZ { {} };
-        std::array<juce::dsp::IIR::Filter<float>, kMax> scHp;
+        std::array<double, kMax> envD { {} }, envO { {} }, rms { {} }, colZ { {} };
+        std::array<juce::dsp::IIR::Filter<double>, kMax> scHp;
         const DriftModel* drift = nullptr;
-        float grReadout = 0.0f;
+        double grReadout = 0.0;
     };
 }

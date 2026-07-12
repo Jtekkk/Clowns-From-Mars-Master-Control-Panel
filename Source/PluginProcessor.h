@@ -16,20 +16,25 @@
 /**
     MASTER CONTROL PANEL — intelligent analog-modelled mastering processor.
 
+    The entire internal signal path runs in 64-bit double precision. When the
+    host offers double-precision buffers we process them natively; when it hands
+    us 32-bit buffers we widen to double, process, and narrow back — so the DSP
+    always works at reference fidelity regardless of host precision.
+
     Signal flow (per block):
 
-        Input Trim
+        Input Trim (smoothed)
           -> EQ (5-band + shelves + HP/LP + AIR/TIGHT)
           -> Compressor (2-stage, M/S aware, sidechain)
           -> [ +Headroom -> Oversample( Tube -> Tape ) -> -Headroom ]
           -> Stereo (Mono Maker + Width)
           -> Circuit Bend
-          -> Output Trim
+          -> Output Trim (smoothed)
           -> Auto-Gain match  ->  Dry/Wet mix  (or Delta)
 
     Engineering: denormals flushed, no audio-thread allocation, selectable
-    oversampling with reported latency, latency-compensated dry path so mix
-    and delta stay phase-aligned.
+    double-precision oversampling with reported latency, latency-compensated dry
+    path, smoothed gain staging, true-peak metering.
 */
 class ControlPanelAudioProcessor : public juce::AudioProcessor
 {
@@ -40,7 +45,10 @@ public:
     void prepareToPlay (double sampleRate, int samplesPerBlock) override;
     void releaseResources() override {}
     bool isBusesLayoutSupported (const BusesLayout& layouts) const override;
-    void processBlock (juce::AudioBuffer<float>&, juce::MidiBuffer&) override;
+
+    bool supportsDoublePrecisionProcessing() const override { return true; }
+    void processBlock (juce::AudioBuffer<float>&,  juce::MidiBuffer&) override;
+    void processBlock (juce::AudioBuffer<double>&, juce::MidiBuffer&) override;
 
     juce::AudioProcessorEditor* createEditor() override;
     bool hasEditor() const override { return true; }
@@ -75,7 +83,7 @@ public:
     // Queries the EQ magnitude response (dB) for the UI curve.
     double getEqMagnitudeDb (double freqHz) noexcept
     {
-        return cfm::dsp::gainToDb ((float) eq.magnitudeAt (freqHz));
+        return cfm::dsp::gainToDb (eq.magnitudeAt (freqHz));
     }
 
     // A/B/C/D snapshot slots.
@@ -95,8 +103,13 @@ private:
 
     void applyProgram (int index);
     void ensureSerial();
-    void alignedDrySetup (int block);
-    void selectOversampling (int choice, int mainCh);
+    void prepareBuffers (int block);
+    void selectOversampling (int choice);
+
+    // The single double-precision core. Operates in place on `main` (up to 2
+    // channels); `sc` is an optional external sidechain (may be nullptr).
+    void processDouble (double* const* main, int mainCh, int numSamples,
+                        const double* const* sc, int scCh);
 
     // Cached raw parameter pointers (atomic, RT-safe reads).
     struct Raw
@@ -123,7 +136,7 @@ private:
 
     void cacheParams();
 
-    // Modules.
+    // Modules (all 64-bit).
     cfm::dsp::DriftModel       driftModel;
     cfm::dsp::EqualizerModule  eq;
     cfm::dsp::CompressorModule comp;
@@ -133,24 +146,29 @@ private:
     cfm::dsp::MeterBallistics  inMeter, outMeter;
     cfm::dsp::AnalyzerFifo     analyzer;
 
-    // Oversampling: index 0->2x, 1->4x, 2->8x. "Off" handled separately.
-    std::array<std::unique_ptr<juce::dsp::Oversampling<float>>, 3> oversamplers;
+    // Double-precision oversampling: index 0->2x, 1->4x, 2->8x. "Off" separate.
+    std::array<std::unique_ptr<juce::dsp::Oversampling<double>>, 3> oversamplers;
     int    currentOsChoice = -1;
     double baseSampleRate  = 44100.0;
     int    maxBlockSize    = 512;
 
     // Latency-compensated dry path.
-    juce::dsp::DelayLine<float, juce::dsp::DelayLineInterpolationTypes::None> dryDelay { 1 << 16 };
-    juce::AudioBuffer<float> dryBuffer;
-    juce::AudioBuffer<float> alignedDry;
+    juce::dsp::DelayLine<double, juce::dsp::DelayLineInterpolationTypes::None> dryDelay { 1 << 16 };
+    juce::AudioBuffer<double> dryBuffer;      // pre-processing capture
+    juce::AudioBuffer<double> alignedDry;     // latency-aligned dry
+    juce::AudioBuffer<double> workBuffer;     // widened main (float path)
+    juce::AudioBuffer<double> scWorkBuffer;   // widened sidechain (float path)
     int reportedLatency = 0;
 
+    // Smoothed gain staging (per-sample, anti-zipper).
+    juce::LinearSmoothedValue<double> inGainSm, outGainSm, mixSm;
+
     // Auto-gain matching.
-    float agInSq = 0.f, agOutSq = 0.f, agCoeff = 0.f, agGainSmoothed = 1.0f;
+    double agInSq = 0.0, agOutSq = 0.0, agCoeff = 0.0, agGainSmoothed = 1.0;
 
     // Bit-crush state for Circuit Bend.
-    std::array<float, 2> cbHold { {} };
-    std::array<int, 2>   cbCounter { {} };
+    std::array<double, 2> cbHold { {} };
+    std::array<int, 2>    cbCounter { {} };
 
     std::atomic<float> grDbAtomic { 0.0f };
     std::atomic<float> autoGainDbAtomic { 0.0f };
