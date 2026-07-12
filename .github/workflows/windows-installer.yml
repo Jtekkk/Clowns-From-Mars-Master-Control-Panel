@@ -25,11 +25,19 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Configure (MSVC, x64)
-        run: cmake -B build -G "Visual Studio 17 2022" -A x64 -DTT_COPY_PLUGIN=OFF
+      - name: Set up MSVC (x64)
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Set up Ninja
+        uses: seanmiddleditch/gha-setup-ninja@v6
+
+      - name: Configure (MSVC + Ninja)
+        run: cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DTT_COPY_PLUGIN=OFF
 
       - name: Build VST3 (Release)
-        run: cmake --build build --config Release --target MasterControlPanel_VST3 --parallel
+        run: cmake --build build --target MasterControlPanel_VST3 --parallel
 
       - name: Locate VST3 bundle
         id: vst3
